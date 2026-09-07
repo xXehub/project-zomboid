@@ -99,6 +99,20 @@ namespace pz {
 	// Reversible fields are restored when their toggle is disabled.
 	void apply_survival_features( const survival_features& features );
     // Refill ammo of the currently held weapon to max once (menu button).
+
+    // ---- debug info for the Debug tab --------------------------------------
+    struct debug_info {
+        bool jni_env_valid;
+        bool class_loader_valid;
+        bool resolved;
+        int screen_w, screen_h, tile_scale, player_idx;
+        float cam_off_x, cam_off_y, zoom;
+        bool frame_ctx_valid;
+        int zombie_count, player_count, vehicle_count, animal_count, item_count;
+        bool isoutils_available;
+        char last_spawn_result[128];
+    };
+    debug_info get_debug_info( );
     void refill_ammo( );
 
 } // namespace pz

@@ -118,14 +118,14 @@ void Menu::Render() {
 				ImGui::PopFont();ImGui::PushFont(tabFont);
 				ImGui::TabSpacer("##TS",ImVec2(75.f,10.f));
 				auto dt=[&](int i,const char*ic){if(tab==i){if(ImGui::SelectedTab(ic,ImVec2(75.f,75.f)))tab=i;}else{if(ImGui::Tab(ic,ImVec2(75.f,75.f)))tab=i;}};
-				dt(0,ICON_FA_SHIELD_ALT); dt(1,ICON_FA_EYE); dt(2,ICON_FA_BOX); dt(3,ICON_FA_COG);
-				ImGui::TabSpacer2("##F1",ImVec2(75.f,75.f));ImGui::TabSpacer2("##F2",ImVec2(75.f,75.f));ImGui::TabSpacer2("##BT",ImVec2(75.f,7.f));
+			dt(0,ICON_FA_SHIELD_ALT); dt(1,ICON_FA_EYE); dt(2,ICON_FA_BOX); dt(3,ICON_FA_COG); dt(4,ICON_FA_BOMB);
+			ImGui::TabSpacer2("##F1",ImVec2(75.f,75.f));ImGui::TabSpacer2("##BT",ImVec2(75.f,7.f));
 				ImGui::PopFont();ImGui::PushFont(menuFont);style->ButtonTextAlign=ImVec2(0.5f,0.5f);
 			}ImGui::EndTabs();
 			ImGui::SameLine(75.f);
 			ImGui::BeginChild("Tab Contents",ImVec2(572.f,542.f),false);{
 				style->Colors[ImGuiCol_Border]=ImColor(0,0,0,0);
-				switch(tab){case 0:General();break;case 1:Visual();break;case 2:Spawner();break;case 3:Settings();break;}
+			switch(tab){case 0:General();break;case 1:Visual();break;case 2:Spawner();break;case 3:Settings();break;case 4:Debug();break;}
 				style->Colors[ImGuiCol_Border]=ImColor(10,10,10,255);
 			}ImGui::EndChild();
 			style->ItemSpacing=ImVec2(4.f,4.f);style->Colors[ImGuiCol_ChildBg]=ImColor(17,17,17,255);
@@ -723,4 +723,78 @@ void DrawOverlay(){
 		fg->AddText(ImVec2(p.x+9,p.y+9),ImColor(0,0,0,180),t);
 		fg->AddText(ImVec2(p.x+8,p.y+8),ImColor(255,255,255,255),t);
 	}
+}
+
+// ====================== Tab 4: Debug ======================================
+void Menu::Debug() {
+	ImGui::Spacing();ImGui::Spacing();
+	ImGui::PushStyleColor(ImGuiCol_ChildBg,ImColor(22,22,22,255).Value);
+	ImGui::BeginChild("##dbg",ImVec2(556.f,520.f),true);{
+		const auto d = pz::get_debug_info();
+
+		// Entity counts from live data
+		int zc=0,pc=0,vc=0,ac=0,ic=0;
+		for(auto&e:g_entities){
+			switch(e.type){
+			case pz::entity_type::zombie: ++zc; break;
+			case pz::entity_type::player: ++pc; break;
+			case pz::entity_type::vehicle: ++vc; break;
+			case pz::entity_type::animal: ++ac; break;
+			case pz::entity_type::item: ++ic; break;
+			}
+		}
+
+		auto status=[](const char*label,bool ok){
+			ImGui::Text("%s:",label);ImGui::SameLine(200.f);
+			if(ok)ImGui::TextColored(ImVec4(0.3f,1.f,0.3f,1.f),"OK");
+			else ImGui::TextColored(ImVec4(1.f,0.3f,0.3f,1.f),"FAIL");
+		};
+
+		ImGui::TextColored(ImVec4(0.47f,0.68f,0.86f,1.f),"=== JNI Bridge ===");
+		status("JNI Environment", d.jni_env_valid);
+		status("Class Loader", d.class_loader_valid);
+		status("Methods Resolved", d.resolved);
+		status("IsoUtils Projection", d.isoutils_available);
+		ImGui::Spacing();
+
+		ImGui::TextColored(ImVec4(0.47f,0.68f,0.86f,1.f),"=== Frame Context ===");
+		status("Frame Valid", d.frame_ctx_valid);
+		ImGui::Text("Screen: %dx%d", d.screen_w, d.screen_h);
+		ImGui::Text("Tile Scale: %d", d.tile_scale);
+		ImGui::Text("Zoom: %.3f", d.zoom);
+		ImGui::Text("Camera Offset: %.1f, %.1f", d.cam_off_x, d.cam_off_y);
+		ImGui::Text("Player Index: %d", d.player_idx);
+		ImGui::Spacing();
+
+		ImGui::TextColored(ImVec4(0.47f,0.68f,0.86f,1.f),"=== Entity Collection ===");
+		ImGui::Text("Total: %d", (int)g_entities.size());
+		ImGui::Text("  Zombies: %d", zc);
+		ImGui::Text("  Players: %d", pc);
+		ImGui::Text("  Vehicles: %d", vc);
+		ImGui::Text("  Animals: %d", ac);
+		ImGui::Text("  Items: %d", ic);
+		// Show first 3 entities with screen coords for projection debug
+		int shown=0;
+		for(auto&e:g_entities){
+			if(shown>=5)break;
+			ImGui::Text("  [%d] %s pos=(%.1f,%.1f,%.1f) scr=(%.0f,%.0f) on=%d dist=%.0f",
+				shown, e.name, e.wx, e.wy, e.wz, e.sx, e.sy, e.on_screen?1:0, e.dist);
+			++shown;
+		}
+		ImGui::Spacing();
+
+		ImGui::TextColored(ImVec4(0.47f,0.68f,0.86f,1.f),"=== Spawner ===");
+		ImGui::Text("Last: %s", d.last_spawn_result);
+		ImGui::Text("Item DB: %d items loaded", pz::item_db_count());
+		ImGui::Spacing();
+
+		ImGui::TextColored(ImVec4(0.47f,0.68f,0.86f,1.f),"=== Feature State ===");
+		ImGui::Text("God mode: %s", menu_state::god_mode?"ON":"off");
+		ImGui::Text("Full bright: %s", menu_state::full_bright?"ON":"off");
+		ImGui::Text("Night vision: %s", menu_state::night_vision?"ON":"off");
+		ImGui::Text("Auto heal: %s", menu_state::auto_heal?"ON":"off");
+		ImGui::Text("Zombie ignore: %s", menu_state::zombie_ignore?"ON":"off");
+		ImGui::Text("ESP render: %s", menu_state::esp_render_enabled?"ON":"off");
+	}ImGui::EndChild();
+	ImGui::PopStyleColor();
 }

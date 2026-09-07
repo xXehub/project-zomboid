@@ -141,6 +141,7 @@ namespace pzj {
         jclass baseVehicle{};
         jclass isoAnimal{};
         jclass worldInventoryObject{};
+        jclass isoUtils{};
     } g_cls;
 
     struct methods {
@@ -179,6 +180,7 @@ namespace pzj {
         jmethodID core_getScreenWidth{};
         jmethodID core_getScreenHeight{};
         jfieldID core_tileScale{};
+        jmethodID core_getZoom{};
 
         // ClimateManager / ClimateFloat
         jmethodID climate_getInstance{};
@@ -251,6 +253,10 @@ namespace pzj {
         jfieldID stat_zombie_fever{};
         jfieldID stat_stress{};
         jfieldID stat_unhappiness{};
+
+        // IsoUtils - use game's own projection (guaranteed correct at any zoom)
+        jmethodID isoutils_XToScreenExact{};
+        jmethodID isoutils_YToScreenExact{};
         // java.util.List
         jmethodID list_size{};
         jmethodID list_get{};
@@ -542,6 +548,7 @@ namespace pzj {
 
         c.bodyPart = fc("zombie/characters/BodyDamage/BodyPart");
         c.bodyPartType = fc("zombie/characters/BodyDamage/BodyPartType");
+        c.isoUtils = fc("zombie/iso/IsoUtils");
 
         // Vehicle / animal / ground-item ESP classes
         c.vehicleManager = fc("zombie/vehicles/VehicleManager");
@@ -593,6 +600,7 @@ namespace pzj {
 
         constexpr auto climate_float_sig =
             "Lzombie/iso/weather/ClimateManager$ClimateFloat;";
+        m.core_getZoom = gm(c.core, "getZoom", "(I)F");
         m.climate_getInstance = sm(c.climateManager, "getInstance",
             "()Lzombie/iso/weather/ClimateManager;");
         m.climate_getFloat = gm(c.climateManager, "getClimateFloat",
@@ -662,6 +670,10 @@ namespace pzj {
         m.bodydamage_getBodyParts = gm(c.bodyDamage, "getBodyParts",
             "()Ljava/util/ArrayList;");
 
+
+        // IsoUtils projection (static methods)
+        m.isoutils_XToScreenExact = sm(c.isoUtils, "XToScreenExact", "(FFFI)F");
+        m.isoutils_YToScreenExact = sm(c.isoUtils, "YToScreenExact", "(FFFI)F");
         // BodyPart wound methods
         m.bodypart_SetInfected = gm(c.bodyPart, "SetInfected", "(Z)V");
         m.bodypart_SetFakeInfected = gm(c.bodyPart, "SetFakeInfected", "(Z)V");
@@ -850,9 +862,29 @@ namespace pz {
         on_screen = false;
         if (!c.valid) return;
 
-        // Equivalent to IsoUtils.X/YToScreenExact. Keeping this arithmetic
-        // native removes two JNI transitions per entity and follows the game's
-        // actual subtraction of camera offsets.
+        // Use the game's own IsoUtils.XToScreenExact / YToScreenExact.
+        // This handles zoom, tileScale, and camera offset correctly at
+        // every zoom level — no manual math that can drift from the game.
+        if (g_m.isoutils_XToScreenExact && g_m.isoutils_YToScreenExact &&
+            g_cls.isoUtils) {
+            sx = g_env->CallStaticFloatMethod(g_cls.isoUtils,
+                g_m.isoutils_XToScreenExact, wx, wy, wz,
+                static_cast<jint>(c.player_idx));
+            sy = g_env->CallStaticFloatMethod(g_cls.isoUtils,
+                g_m.isoutils_YToScreenExact, wx, wy, wz,
+                static_cast<jint>(c.player_idx));
+            if (g_env->ExceptionCheck()) {
+                g_env->ExceptionClear();
+                sx = sy = 0.0f;
+                return;
+            }
+            on_screen = sx > -64.0f && sy > -64.0f &&
+                sx < static_cast<float>(c.screen_w) + 64.0f &&
+                sy < static_cast<float>(c.screen_h) + 64.0f;
+            return;
+        }
+
+        // Fallback: manual isometric math (may be inaccurate at non-default zoom)
         const float scale = static_cast<float>(c.tile_scale);
         sx = (wx - wy) * 32.0f * scale - c.cam_off_x;
         sy = (wx + wy) * 16.0f * scale - wz * 96.0f * scale - c.cam_off_y;
@@ -1342,6 +1374,7 @@ namespace pz {
     }
 
     // ---- spawning -----------------------------------------------------------
+    static char g_last_spawn_msg[128] = "none";
 
     bool spawn_item(const char* full_type)
     {
@@ -1351,19 +1384,6 @@ namespace pz {
         pzj::jframe fr;
         if (!fr.ok) return false;
 
-        // Use InventoryItemFactory.CreateItem(String) for proper initialization,
-        // then AddItem(InventoryItem) to hand the fully-initialized item to
-        // the player's inventory. This ensures the item has correct scriptItem,
-        // WorldItem ref, and can be worn/used/dropped normally.
-        jstring jt = pzj::utf8_to_jstr(full_type);
-        const auto item = static_cast<jobject>(
-            g_env->CallStaticObjectMethod(g_cls.itemFactory,
-                g_m.factory_CreateItem_str, jt));
-        if (g_env->ExceptionCheck() || !item) {
-            g_env->ExceptionClear();
-            return false;
-        }
-
         const auto player = static_cast<jobject>(
             g_env->CallStaticObjectMethod(g_cls.isoPlayer, g_m.player_getInstance));
         if (g_env->ExceptionCheck() || !player) { g_env->ExceptionClear(); return false; }
@@ -1372,21 +1392,21 @@ namespace pz {
             g_env->CallObjectMethod(player, g_m.char_getInventory));
         if (g_env->ExceptionCheck() || !inv) { g_env->ExceptionClear(); return false; }
 
-        // AddItem(InventoryItem) — resolved lazily, same cache as spawn_item_custom.
-        static jmethodID add_item_obj = nullptr;
-        if (!add_item_obj) {
-            add_item_obj = g_env->GetMethodID(g_cls.itemContainer, "AddItem",
-                "(Lzombie/inventory/InventoryItem;)Lzombie/inventory/InventoryItem;");
-            if (!add_item_obj) g_env->ExceptionClear();
-        }
-        if (!add_item_obj) return false;
-
+        // Use the game's own ItemContainer.AddItem(String fullType).
+        // This is PZ's native add-item path: it looks up the script by full
+        // type name, creates a properly initialized InventoryItem with correct
+        // module, scriptItem, container linkage, and returns it ready to
+        // wear / equip / use / drop. CreateItem+AddItem(obj) skips the
+        // container-binding step and produces ghost items.
+        jstring jt = pzj::utf8_to_jstr(full_type);
         const auto added = static_cast<jobject>(
-            g_env->CallObjectMethod(inv, add_item_obj, item));
-        const bool ok = (added != nullptr);
+            g_env->CallObjectMethod(inv, g_m.container_AddItem_str, jt));
         if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); return false; }
+        const bool ok = (added != nullptr);
 
-        pzlog2::log("spawn_item %s -> %s", full_type, ok ? "ok" : "null");
+        _snprintf_s(g_last_spawn_msg, sizeof(g_last_spawn_msg), _TRUNCATE,
+            "spawn %s -> %s", full_type, ok ? "ok" : "FAIL");
+        pzlog2::log("%s", g_last_spawn_msg);
         return ok;
     }
 
@@ -1454,9 +1474,41 @@ namespace pz {
         const bool ok = (added != nullptr);
         if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); return false; }
 
-        pzlog2::log("spawn_item_custom %s cond=%d ammo=%d -> %s",
-            full_type, condition, ammo, ok ? "ok" : "null");
+        _snprintf_s(g_last_spawn_msg, sizeof(g_last_spawn_msg), _TRUNCATE,
+            "custom %s c=%d a=%d -> %s", full_type, condition, ammo, ok ? "ok" : "FAIL");
+        pzlog2::log("%s", g_last_spawn_msg);
         return ok;
+    }
+
+    // ---- debug ---------------------------------------------------------------
+
+    debug_info get_debug_info()
+    {
+        debug_info d{};
+        d.jni_env_valid = (pzj::g_env != nullptr);
+        d.class_loader_valid = (pzj::g_class_loader != nullptr);
+        d.resolved = pzj::g_resolved;
+        d.screen_w = g_frame_ctx.screen_w;
+        d.screen_h = g_frame_ctx.screen_h;
+        d.tile_scale = g_frame_ctx.tile_scale;
+        d.player_idx = g_frame_ctx.player_idx;
+        d.cam_off_x = g_frame_ctx.cam_off_x;
+        d.cam_off_y = g_frame_ctx.cam_off_y;
+        d.frame_ctx_valid = g_frame_ctx.valid;
+        d.isoutils_available = (g_m.isoutils_XToScreenExact != nullptr);
+        d.zoom = 0.0f;
+        if (d.resolved && g_m.core_getZoom && g_cls.core) {
+            const auto core = static_cast<jobject>(
+                g_env->CallStaticObjectMethod(g_cls.core, g_m.core_getInstance));
+            if (!g_env->ExceptionCheck() && core) {
+                d.zoom = g_env->CallFloatMethod(core, g_m.core_getZoom,
+                    static_cast<jint>(g_frame_ctx.player_idx));
+                if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); d.zoom = 0; }
+            } else { g_env->ExceptionClear(); }
+        }
+        ::strncpy_s(d.last_spawn_result, sizeof(d.last_spawn_result),
+            g_last_spawn_msg, _TRUNCATE);
+        return d;
     }
 
     // ---- toggles --------------------------------------------------------------
@@ -2046,7 +2098,7 @@ namespace pz {
         g_frame_ctx = {};
         g_seen_world = false;
 
-        const std::array<jclass*, 24> classes{
+        const std::array<jclass*, 29> classes{
             &g_cls.isoPlayer,
             &g_cls.isoZombie,
             &g_cls.isoGameCharacter,
@@ -2070,6 +2122,11 @@ namespace pz {
             &g_cls.characterStat,
             &g_cls.systemDisabler,
             &g_cls.core,
+            &g_cls.vehicleManager,
+            &g_cls.baseVehicle,
+            &g_cls.isoAnimal,
+            &g_cls.worldInventoryObject,
+            &g_cls.isoUtils,
             nullptr
         };
         for (auto* const cls : classes) {

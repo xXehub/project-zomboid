@@ -15,6 +15,7 @@ public:
 	void Visual();     // tab 1
 	void Spawner();    // tab 2
 	void Settings();   // tab 3
+	void Debug();      // tab 4
 
 	bool isOpen = false;
 };
