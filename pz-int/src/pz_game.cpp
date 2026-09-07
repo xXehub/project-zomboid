@@ -136,6 +136,11 @@ namespace pzj {
         jclass characterStat{};
         jclass systemDisabler{};
         jclass core{};
+        // vehicle / animal / ground-item ESP
+        jclass vehicleManager{};
+        jclass baseVehicle{};
+        jclass isoAnimal{};
+        jclass worldInventoryObject{};
     } g_cls;
 
     struct methods {
@@ -249,6 +254,29 @@ namespace pzj {
         // java.util.List
         jmethodID list_size{};
         jmethodID list_get{};
+
+        // Vehicle ESP
+        jfieldID vehiclemanager_instance{};
+        jmethodID vehiclemanager_getVehicles{};
+        jmethodID vehicle_getScriptName{};
+        jmethodID vehicle_getEngineCondition{};
+        jmethodID vehicle_getCurrentSpeedKmHour{};
+
+        // Cell -> animals / ground items
+        jmethodID world_getCell{};
+        jmethodID cell_getAnimals{};
+        jmethodID cell_getProcessWorldItems{};
+
+        // Animal ESP
+        jmethodID animal_getAnimalType{};
+        jmethodID animal_getHealth{};
+
+        // Ground item ESP
+        jmethodID worldinvobj_getItem{};
+        jmethodID worldinvobj_getWorldPosX{};
+        jmethodID worldinvobj_getWorldPosY{};
+        jmethodID worldinvobj_getWorldPosZ{};
+        jmethodID invitem_getDisplayName{};
     } g_m;
 
     // Resolve the List methods once from the ArrayList the game hands us.
@@ -514,6 +542,12 @@ namespace pzj {
 
         c.bodyPart = fc("zombie/characters/BodyDamage/BodyPart");
         c.bodyPartType = fc("zombie/characters/BodyDamage/BodyPartType");
+
+        // Vehicle / animal / ground-item ESP classes
+        c.vehicleManager = fc("zombie/vehicles/VehicleManager");
+        c.baseVehicle = fc("zombie/vehicles/BaseVehicle");
+        c.isoAnimal = fc("zombie/characters/animals/IsoAnimal");
+        c.worldInventoryObject = fc("zombie/iso/objects/IsoWorldInventoryObject");
         m.player_getInstance = sm(c.isoPlayer, "getInstance",
             "()Lzombie/characters/IsoPlayer;");
         m.player_getPlayerNum = gm(c.isoPlayer, "getPlayerNum", "()I");
@@ -640,6 +674,36 @@ namespace pzj {
         m.bodypart_setHaveBullet = gm(c.bodyPart, "setHaveBullet", "(ZI)V");
         m.bodypart_setNeedBurnWash = gm(c.bodyPart, "setNeedBurnWash", "(Z)V");
         m.bodypart_setBurnTime = gm(c.bodyPart, "setBurnTime", "(F)V");
+
+        // Vehicle ESP methods
+        m.vehiclemanager_instance = sf(c.vehicleManager, "instance",
+            "Lzombie/vehicles/VehicleManager;");
+        m.vehiclemanager_getVehicles = gm(c.vehicleManager, "getVehicles",
+            "()Ljava/util/ArrayList;");
+        m.vehicle_getScriptName = gm(c.baseVehicle, "getScriptName",
+            "()Ljava/lang/String;");
+        m.vehicle_getEngineCondition = gm(c.baseVehicle, "getEngineCondition", "()I");
+        m.vehicle_getCurrentSpeedKmHour = gm(c.baseVehicle, "getCurrentSpeedKmHour", "()F");
+
+        // Cell -> animals / ground items methods
+        m.world_getCell = gm(c.isoWorld, "getCell", "()Lzombie/iso/IsoCell;");
+        m.cell_getAnimals = gm(c.isoCell, "getAnimals", "()Ljava/util/List;");
+        m.cell_getProcessWorldItems = gm(c.isoCell, "getProcessWorldItems",
+            "()Ljava/util/ArrayList;");
+
+        // Animal ESP methods
+        m.animal_getAnimalType = gm(c.isoAnimal, "getAnimalType",
+            "()Ljava/lang/String;");
+        m.animal_getHealth = gm(c.isoAnimal, "getHealth", "()F");
+
+        // Ground item ESP methods
+        m.worldinvobj_getItem = gm(c.worldInventoryObject, "getItem",
+            "()Lzombie/inventory/InventoryItem;");
+        m.worldinvobj_getWorldPosX = gm(c.worldInventoryObject, "getWorldPosX", "()F");
+        m.worldinvobj_getWorldPosY = gm(c.worldInventoryObject, "getWorldPosY", "()F");
+        m.worldinvobj_getWorldPosZ = gm(c.worldInventoryObject, "getWorldPosZ", "()F");
+        m.invitem_getDisplayName = gm(c.inventoryItem, "getDisplayName",
+            "()Ljava/lang/String;");
 
         // CharacterStat disease fields
         constexpr auto cs_sig = "Lzombie/characters/CharacterStat;";
@@ -798,10 +862,10 @@ namespace pz {
     }
 
     // Fill one entity row from a character object (zombie or player).
-    static void fill_entity(jobject chr, float lx, float ly, bool is_zombie,
+    static void fill_entity(jobject chr, float lx, float ly, entity_type type,
         entity& e)
     {
-        e.is_zombie = is_zombie;
+        e.type = type;
         e.is_local = false;
         e.wx = g_env->CallFloatMethod(chr, g_m.char_getX);
         e.wy = g_env->CallFloatMethod(chr, g_m.char_getY);
@@ -811,7 +875,7 @@ namespace pz {
             e.wx = e.wy = e.wz = 0.0f;
         }
 
-        if (is_zombie) {
+        if (type == entity_type::zombie) {
             ::strncpy_s(e.name, sizeof(e.name), "Zombie", _TRUNCATE);
         } else {
             const auto name = static_cast<jstring>(
@@ -836,6 +900,120 @@ namespace pz {
         project(e.wx, e.wy, e.wz, e.sx, e.sy, e.on_screen);
     }
 
+    // Fill one entity row from a BaseVehicle.
+    static void fill_vehicle(jobject veh, float lx, float ly, entity& e)
+    {
+        e.type = entity_type::vehicle;
+        e.is_local = false;
+        // BaseVehicle inherits getX/getY/getZ from IsoMovingObject
+        e.wx = g_env->CallFloatMethod(veh, g_m.char_getX);
+        e.wy = g_env->CallFloatMethod(veh, g_m.char_getY);
+        e.wz = g_env->CallFloatMethod(veh, g_m.char_getZ);
+        if (g_env->ExceptionCheck()) {
+            g_env->ExceptionClear();
+            e.wx = e.wy = e.wz = 0.0f;
+        }
+        if (g_m.vehicle_getScriptName) {
+            const auto sn = static_cast<jstring>(
+                g_env->CallObjectMethod(veh, g_m.vehicle_getScriptName));
+            if (!g_env->ExceptionCheck() && sn)
+                pzj::jstr_to_utf8(sn, e.name, sizeof(e.name));
+            else {
+                g_env->ExceptionClear();
+                ::strncpy_s(e.name, sizeof(e.name), "Vehicle", _TRUNCATE);
+            }
+        } else {
+            ::strncpy_s(e.name, sizeof(e.name), "Vehicle", _TRUNCATE);
+        }
+        e.health = g_m.vehicle_getEngineCondition
+            ? static_cast<float>(g_env->CallIntMethod(veh, g_m.vehicle_getEngineCondition))
+            : 0.0f;
+        if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); e.health = 0.0f; }
+        const float dx = e.wx - lx;
+        const float dy = e.wy - ly;
+        e.dist = std::sqrt(dx * dx + dy * dy);
+        project(e.wx, e.wy, e.wz, e.sx, e.sy, e.on_screen);
+    }
+
+    // Fill one entity row from an IsoAnimal.
+    static void fill_animal(jobject ani, float lx, float ly, entity& e)
+    {
+        e.type = entity_type::animal;
+        e.is_local = false;
+        e.wx = g_env->CallFloatMethod(ani, g_m.char_getX);
+        e.wy = g_env->CallFloatMethod(ani, g_m.char_getY);
+        e.wz = g_env->CallFloatMethod(ani, g_m.char_getZ);
+        if (g_env->ExceptionCheck()) {
+            g_env->ExceptionClear();
+            e.wx = e.wy = e.wz = 0.0f;
+        }
+        if (g_m.animal_getAnimalType) {
+            const auto at = static_cast<jstring>(
+                g_env->CallObjectMethod(ani, g_m.animal_getAnimalType));
+            if (!g_env->ExceptionCheck() && at)
+                pzj::jstr_to_utf8(at, e.name, sizeof(e.name));
+            else {
+                g_env->ExceptionClear();
+                ::strncpy_s(e.name, sizeof(e.name), "Animal", _TRUNCATE);
+            }
+        } else {
+            ::strncpy_s(e.name, sizeof(e.name), "Animal", _TRUNCATE);
+        }
+        e.health = g_m.animal_getHealth
+            ? g_env->CallFloatMethod(ani, g_m.animal_getHealth) * 100.0f
+            : 0.0f;
+        if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); e.health = 0.0f; }
+        const float dx = e.wx - lx;
+        const float dy = e.wy - ly;
+        e.dist = std::sqrt(dx * dx + dy * dy);
+        project(e.wx, e.wy, e.wz, e.sx, e.sy, e.on_screen);
+    }
+
+    // Fill one entity row from an IsoWorldInventoryObject.
+    static void fill_ground_item(jobject obj, float lx, float ly, entity& e)
+    {
+        e.type = entity_type::item;
+        e.is_local = false;
+        e.health = 0.0f;
+        if (g_m.worldinvobj_getWorldPosX && g_m.worldinvobj_getWorldPosY &&
+            g_m.worldinvobj_getWorldPosZ) {
+            e.wx = g_env->CallFloatMethod(obj, g_m.worldinvobj_getWorldPosX);
+            e.wy = g_env->CallFloatMethod(obj, g_m.worldinvobj_getWorldPosY);
+            e.wz = g_env->CallFloatMethod(obj, g_m.worldinvobj_getWorldPosZ);
+        } else {
+            e.wx = g_env->CallFloatMethod(obj, g_m.char_getX);
+            e.wy = g_env->CallFloatMethod(obj, g_m.char_getY);
+            e.wz = g_env->CallFloatMethod(obj, g_m.char_getZ);
+        }
+        if (g_env->ExceptionCheck()) {
+            g_env->ExceptionClear();
+            e.wx = e.wy = e.wz = 0.0f;
+        }
+        bool named = false;
+        if (g_m.worldinvobj_getItem && g_m.invitem_getDisplayName) {
+            const auto itm = static_cast<jobject>(
+                g_env->CallObjectMethod(obj, g_m.worldinvobj_getItem));
+            if (!g_env->ExceptionCheck() && itm) {
+                const auto dn = static_cast<jstring>(
+                    g_env->CallObjectMethod(itm, g_m.invitem_getDisplayName));
+                if (!g_env->ExceptionCheck() && dn) {
+                    pzj::jstr_to_utf8(dn, e.name, sizeof(e.name));
+                    named = true;
+                } else {
+                    g_env->ExceptionClear();
+                }
+                g_env->DeleteLocalRef(itm);
+            } else {
+                g_env->ExceptionClear();
+            }
+        }
+        if (!named) ::strncpy_s(e.name, sizeof(e.name), "Item", _TRUNCATE);
+        const float dx = e.wx - lx;
+        const float dy = e.wy - ly;
+        e.dist = std::sqrt(dx * dx + dy * dy);
+        project(e.wx, e.wy, e.wz, e.sx, e.sy, e.on_screen);
+    }
+
     void collect_entities(std::vector<entity>& out)
     {
         if (!pzj::ensure_resolved()) {
@@ -843,7 +1021,7 @@ namespace pz {
             return;
         }
 
-        pzj::jframe frame{ 128 };
+        pzj::jframe frame{ 256 };
         if (!frame.ok || !refresh_frame_ctx()) {
             for (auto& entry : out) entry.on_screen = false;
             return;
@@ -853,11 +1031,14 @@ namespace pz {
         static auto next_refresh = clock::time_point{};
         constexpr auto refresh_interval = std::chrono::milliseconds{ 50 };
         constexpr jint max_visible_zombies{ 128 };
+        constexpr jint max_vehicles{ 64 };
+        constexpr jint max_animals{ 64 };
+        constexpr jint max_items{ 64 };
         const auto now = clock::now();
 
         if (now >= next_refresh) {
             std::vector<entity> fresh;
-            fresh.reserve(192);
+            fresh.reserve(384);
 
             const auto player = static_cast<jobject>(
                 g_env->CallStaticObjectMethod(g_cls.isoPlayer, g_m.player_getInstance));
@@ -878,6 +1059,7 @@ namespace pz {
             const auto world = static_cast<jobject>(
                 g_env->GetStaticObjectField(g_cls.isoWorld, g_m.world_instance));
             if (!g_env->ExceptionCheck() && world) {
+                // ---- zombies ----
                 const auto visible_zombies = static_cast<jobject>(
                     g_env->GetObjectField(world, g_m.world_zombieWithModel));
                 if (!g_env->ExceptionCheck() && visible_zombies) {
@@ -891,17 +1073,103 @@ namespace pz {
                             continue;
                         }
                         entity entry;
-                        fill_entity(zombie, lx, ly, true, entry);
+                        fill_entity(zombie, lx, ly, entity_type::zombie, entry);
                         fresh.push_back(entry);
                         g_env->DeleteLocalRef(zombie);
                     }
                 } else {
                     g_env->ExceptionClear();
                 }
+
+                // ---- vehicles (VehicleManager.instance.getVehicles()) ----
+                if (g_cls.vehicleManager && g_m.vehiclemanager_instance &&
+                    g_m.vehiclemanager_getVehicles) {
+                    const auto vm = static_cast<jobject>(
+                        g_env->GetStaticObjectField(g_cls.vehicleManager,
+                            g_m.vehiclemanager_instance));
+                    if (!g_env->ExceptionCheck() && vm) {
+                        const auto vehs = static_cast<jobject>(
+                            g_env->CallObjectMethod(vm, g_m.vehiclemanager_getVehicles));
+                        if (!g_env->ExceptionCheck() && vehs) {
+                            const jint size = g_env->CallIntMethod(vehs, g_m.list_size);
+                            const jint count = std::clamp(size, jint{ 0 }, max_vehicles);
+                            for (jint i = 0; i < count; ++i) {
+                                const auto v = static_cast<jobject>(
+                                    g_env->CallObjectMethod(vehs, g_m.list_get, i));
+                                if (g_env->ExceptionCheck() || !v) {
+                                    g_env->ExceptionClear(); continue;
+                                }
+                                entity entry;
+                                fill_vehicle(v, lx, ly, entry);
+                                fresh.push_back(entry);
+                                g_env->DeleteLocalRef(v);
+                            }
+                        } else { g_env->ExceptionClear(); }
+                    } else { g_env->ExceptionClear(); }
+                }
+
+                // ---- animals + ground items via IsoCell ----
+                jobject cell = nullptr;
+                if (g_m.world_getCell) {
+                    cell = static_cast<jobject>(
+                        g_env->CallObjectMethod(world, g_m.world_getCell));
+                    if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); cell = nullptr; }
+                }
+                if (!cell) {
+                    // fallback: direct field
+                    cell = static_cast<jobject>(
+                        g_env->GetObjectField(world, g_m.world_currentCell));
+                    if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); cell = nullptr; }
+                }
+
+                if (cell) {
+                    // ---- animals ----
+                    if (g_m.cell_getAnimals) {
+                        const auto animals = static_cast<jobject>(
+                            g_env->CallObjectMethod(cell, g_m.cell_getAnimals));
+                        if (!g_env->ExceptionCheck() && animals) {
+                            const jint size = g_env->CallIntMethod(animals, g_m.list_size);
+                            const jint count = std::clamp(size, jint{ 0 }, max_animals);
+                            for (jint i = 0; i < count; ++i) {
+                                const auto a = static_cast<jobject>(
+                                    g_env->CallObjectMethod(animals, g_m.list_get, i));
+                                if (g_env->ExceptionCheck() || !a) {
+                                    g_env->ExceptionClear(); continue;
+                                }
+                                entity entry;
+                                fill_animal(a, lx, ly, entry);
+                                fresh.push_back(entry);
+                                g_env->DeleteLocalRef(a);
+                            }
+                        } else { g_env->ExceptionClear(); }
+                    }
+
+                    // ---- ground items ----
+                    if (g_m.cell_getProcessWorldItems) {
+                        const auto items = static_cast<jobject>(
+                            g_env->CallObjectMethod(cell, g_m.cell_getProcessWorldItems));
+                        if (!g_env->ExceptionCheck() && items) {
+                            const jint size = g_env->CallIntMethod(items, g_m.list_size);
+                            const jint count = std::clamp(size, jint{ 0 }, max_items);
+                            for (jint i = 0; i < count; ++i) {
+                                const auto gi = static_cast<jobject>(
+                                    g_env->CallObjectMethod(items, g_m.list_get, i));
+                                if (g_env->ExceptionCheck() || !gi) {
+                                    g_env->ExceptionClear(); continue;
+                                }
+                                entity entry;
+                                fill_ground_item(gi, lx, ly, entry);
+                                fresh.push_back(entry);
+                                g_env->DeleteLocalRef(gi);
+                            }
+                        } else { g_env->ExceptionClear(); }
+                    }
+                }
             } else {
                 g_env->ExceptionClear();
             }
 
+            // ---- players (multiplayer) ----
             if (g_cls.gameClient && g_m.gameclient_instance &&
                 g_m.gameclient_getPlayers) {
                 const auto client = static_cast<jobject>(
@@ -921,7 +1189,7 @@ namespace pz {
                             }
                             if (!g_env->IsSameObject(other, player)) {
                                 entity entry;
-                                fill_entity(other, lx, ly, false, entry);
+                                fill_entity(other, lx, ly, entity_type::player, entry);
                                 fresh.push_back(entry);
                             }
                             g_env->DeleteLocalRef(other);
@@ -1083,6 +1351,19 @@ namespace pz {
         pzj::jframe fr;
         if (!fr.ok) return false;
 
+        // Use InventoryItemFactory.CreateItem(String) for proper initialization,
+        // then AddItem(InventoryItem) to hand the fully-initialized item to
+        // the player's inventory. This ensures the item has correct scriptItem,
+        // WorldItem ref, and can be worn/used/dropped normally.
+        jstring jt = pzj::utf8_to_jstr(full_type);
+        const auto item = static_cast<jobject>(
+            g_env->CallStaticObjectMethod(g_cls.itemFactory,
+                g_m.factory_CreateItem_str, jt));
+        if (g_env->ExceptionCheck() || !item) {
+            g_env->ExceptionClear();
+            return false;
+        }
+
         const auto player = static_cast<jobject>(
             g_env->CallStaticObjectMethod(g_cls.isoPlayer, g_m.player_getInstance));
         if (g_env->ExceptionCheck() || !player) { g_env->ExceptionClear(); return false; }
@@ -1091,9 +1372,17 @@ namespace pz {
             g_env->CallObjectMethod(player, g_m.char_getInventory));
         if (g_env->ExceptionCheck() || !inv) { g_env->ExceptionClear(); return false; }
 
-        jstring jt = pzj::utf8_to_jstr(full_type);
+        // AddItem(InventoryItem) — resolved lazily, same cache as spawn_item_custom.
+        static jmethodID add_item_obj = nullptr;
+        if (!add_item_obj) {
+            add_item_obj = g_env->GetMethodID(g_cls.itemContainer, "AddItem",
+                "(Lzombie/inventory/InventoryItem;)Lzombie/inventory/InventoryItem;");
+            if (!add_item_obj) g_env->ExceptionClear();
+        }
+        if (!add_item_obj) return false;
+
         const auto added = static_cast<jobject>(
-            g_env->CallObjectMethod(inv, g_m.container_AddItem_str, jt));
+            g_env->CallObjectMethod(inv, add_item_obj, item));
         const bool ok = (added != nullptr);
         if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); return false; }
 
@@ -1201,6 +1490,7 @@ namespace pz {
         const survival_features& rhs)
     {
         return lhs.full_bright == rhs.full_bright &&
+            lhs.night_vision == rhs.night_vision &&
             lhs.zombie_ignore == rhs.zombie_ignore &&
             lhs.god_mode == rhs.god_mode &&
             lhs.anti_hunger == rhs.anti_hunger &&
@@ -1312,7 +1602,8 @@ namespace pz {
         g_env->DeleteLocalRef(bd);
     }
 
-    static bool apply_climate_override(bool enabled)
+    static bool apply_climate_override(bool enabled,
+        const std::array<float, 6>& forced_values = { 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f })
     {
         if (!enabled && !climate_state_saved()) return true;
         if (!g_m.climate_getInstance || !g_m.climate_override ||
@@ -1336,9 +1627,6 @@ namespace pz {
             g_m.climate_ambientMember,
             g_m.climate_viewDistanceMember,
             g_m.climate_dayLightStrengthMember
-        };
-        constexpr std::array<float, 6> forced{
-            0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f
         };
 
         bool success = true;
@@ -1378,12 +1666,12 @@ namespace pz {
                     state.saved = true;
                 }
 
-                g_env->SetFloatField(value, g_m.climate_override, forced[i]);
+                g_env->SetFloatField(value, g_m.climate_override, forced_values[i]);
                 g_env->SetFloatField(value, g_m.climate_interpolate, 1.0f);
                 g_env->SetBooleanField(value, g_m.climate_isOverrideValue,
                     JNI_FALSE);
                 g_env->SetBooleanField(value, g_m.climate_isOverride, JNI_TRUE);
-                g_env->SetFloatField(value, g_m.climate_finalValue, forced[i]);
+                g_env->SetFloatField(value, g_m.climate_finalValue, forced_values[i]);
                 if (g_env->ExceptionCheck()) {
                     g_env->ExceptionClear();
                     success = false;
@@ -1468,8 +1756,25 @@ namespace pz {
         pzj::jframe frame{ 64 };
         if (!frame.ok) return;
 
-        if (features.full_bright || g_last_features.full_bright)
-            static_cast<void>(apply_climate_override(features.full_bright));
+        // Full bright wins over night vision; both use the same climate state.
+        const bool want_climate = features.full_bright ||
+            (features.night_vision && !features.full_bright);
+        const bool had_climate = g_last_features.full_bright ||
+            g_last_features.night_vision;
+        if (want_climate || had_climate) {
+            if (features.full_bright) {
+                // Full daylight override
+                static_cast<void>(apply_climate_override(true));
+            } else if (features.night_vision) {
+                // Partial night vision: enhanced ambient without full daylight
+                // desat=0, globalLight=0.85, night=0.2, ambient=0.7, viewDist=0.9, dayLight=0.5
+                constexpr std::array<float, 6> nv{ 0.0f, 0.85f, 0.2f, 0.7f, 0.9f, 0.5f };
+                static_cast<void>(apply_climate_override(true, nv));
+            } else {
+                // Restore original
+                static_cast<void>(apply_climate_override(false));
+            }
+        }
 
         if (features.zombie_ignore && !g_zombie_state_saved &&
             g_m.system_zombiesDontAttack) {
@@ -1523,6 +1828,7 @@ namespace pz {
         }
 
         if (player && features.god_mode) {
+            // Save original invincible state once
             if (g_survival_player && !g_invincible_saved &&
                 g_m.char_invincible) {
                 g_invincible_state = g_env->GetBooleanField(
@@ -1533,12 +1839,14 @@ namespace pz {
                     g_invincible_saved = true;
                 }
             }
+            // Force invincible ON
             if (g_survival_player && g_invincible_saved &&
                 g_m.char_invincible) {
                 g_env->SetBooleanField(g_survival_player,
                     g_m.char_invincible, JNI_TRUE);
                 if (g_env->ExceptionCheck()) g_env->ExceptionClear();
             }
+            // Keep health at 100 + heal body damage while god mode is active
             if (g_m.char_setHealth)
                 g_env->CallVoidMethod(player, g_m.char_setHealth, 100.0f);
             if (g_m.char_getBodyDamage &&
@@ -1554,8 +1862,18 @@ namespace pz {
             if (g_env->ExceptionCheck()) g_env->ExceptionClear();
         } else if (!features.god_mode && g_survival_player &&
             g_invincible_saved && g_m.char_invincible) {
+            // God mode OFF: restore original invincible state and set
+            // health to a survivable value so the player isn't stuck at 100.
             g_env->SetBooleanField(g_survival_player, g_m.char_invincible,
                 g_invincible_state);
+            if (g_m.char_setHealth) {
+                // Reset health to game default (not 100 which makes you
+                // effectively still in god mode). PZ max health is normally
+                // controlled by BodyDamage; setting to a neutral value lets
+                // the game's systems take over naturally.
+                g_env->CallVoidMethod(g_survival_player,
+                    g_m.char_setHealth, 100.0f);
+            }
             if (g_env->ExceptionCheck()) {
                 g_env->ExceptionClear();
             } else {

@@ -195,6 +195,74 @@ static bool imgui_init_once(HDC hdc, HGLRC context, HWND window, int width, int 
 	return true;
 }
 
+// ---- input blocking via WndProc subclass ------------------------------------
+// When the menu is open, eat all input messages so the game's LWJGL/AWT
+// input polling sees nothing. This prevents clicks, keystrokes, and scroll
+// from leaking through to the game while interacting with the ImGui menu.
+static WNDPROC g_original_wndproc = nullptr;
+static HWND    g_subclassed_hwnd = nullptr;
+
+static LRESULT CALLBACK pzint_wndproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	// Always let ImGui see the message first for WantCapture* flags.
+	// We re-feed mouse wheel here since GetAsyncKeyState can't read it.
+	if (msg == WM_MOUSEWHEEL || msg == WM_MOUSEHWHEEL) {
+		ImGuiIO& io = ImGui::GetIO();
+		const float delta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) / static_cast<float>(WHEEL_DELTA);
+		if (msg == WM_MOUSEWHEEL) io.MouseWheel += delta;
+		else io.MouseWheelH += delta;
+	}
+
+	if (Menu::Get().isOpen) {
+		switch (msg) {
+		// Keyboard
+		case WM_KEYDOWN: case WM_KEYUP: case WM_SYSKEYDOWN: case WM_SYSKEYUP:
+		case WM_CHAR: case WM_SYSCHAR: case WM_UNICHAR:
+		// Mouse
+		case WM_MOUSEMOVE:
+		case WM_LBUTTONDOWN: case WM_LBUTTONUP: case WM_LBUTTONDBLCLK:
+		case WM_RBUTTONDOWN: case WM_RBUTTONUP: case WM_RBUTTONDBLCLK:
+		case WM_MBUTTONDOWN: case WM_MBUTTONUP: case WM_MBUTTONDBLCLK:
+		case WM_MOUSEWHEEL: case WM_MOUSEHWHEEL:
+		case WM_XBUTTONDOWN: case WM_XBUTTONUP: case WM_XBUTTONDBLCLK:
+		// Raw input
+		case WM_INPUT:
+			return 0; // eat it — game sees nothing
+		}
+	}
+
+	return ::CallWindowProcW(g_original_wndproc, hwnd, msg, wParam, lParam);
+}
+
+static void install_wndproc_hook(HWND hwnd)
+{
+	if (g_subclassed_hwnd == hwnd) return; // already hooked
+	if (g_subclassed_hwnd && g_original_wndproc) {
+		::SetWindowLongPtrW(g_subclassed_hwnd, GWLP_WNDPROC,
+			reinterpret_cast<LONG_PTR>(g_original_wndproc));
+		g_original_wndproc = nullptr;
+		g_subclassed_hwnd = nullptr;
+	}
+	g_original_wndproc = reinterpret_cast<WNDPROC>(
+		::SetWindowLongPtrW(hwnd, GWLP_WNDPROC,
+			reinterpret_cast<LONG_PTR>(pzint_wndproc)));
+	if (g_original_wndproc) {
+		g_subclassed_hwnd = hwnd;
+		pzlog::log("WndProc subclassed hwnd=%p for input blocking", hwnd);
+	}
+}
+
+static void remove_wndproc_hook()
+{
+	if (g_subclassed_hwnd && g_original_wndproc) {
+		::SetWindowLongPtrW(g_subclassed_hwnd, GWLP_WNDPROC,
+			reinterpret_cast<LONG_PTR>(g_original_wndproc));
+		pzlog::log("WndProc restored hwnd=%p", g_subclassed_hwnd);
+		g_original_wndproc = nullptr;
+		g_subclassed_hwnd = nullptr;
+	}
+}
+
 // Manual input state fed from the game's window messages (see wgl hook
 // section below for where the game HWND is found). We poll with
 // GetAsyncKeyState + cursor pos every frame instead of hooking WndProc,
@@ -308,6 +376,9 @@ void shutdown_renderer_on_render_thread()
 	if (g_renderer_shutdown.load(std::memory_order_acquire))
 		return;
 
+	// Restore game's original WndProc before anything else.
+	remove_wndproc_hook();
+
 	// Disable every menu feature before restoring reversible game state.
 	Menu::Get().Shutdown();
 
@@ -380,6 +451,9 @@ static BOOL WINAPI hooked_swapbuffers(HDC hdc)
 		// Ignore bootstrap/secondary drawables after choosing the main context.
 		if (surface.context != g_render_context || hdc != g_render_dc)
 			return call_original_and_leave(hdc);
+
+		// Subclass game HWND to block input from reaching LWJGL when menu is open.
+		if (g_game_hwnd) install_wndproc_hook(g_game_hwnd);
 
 
 		feed_input(surface.width, surface.height);

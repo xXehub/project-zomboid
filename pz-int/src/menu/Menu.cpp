@@ -39,7 +39,7 @@ bool g_game_ready = false;
 float g_menu_accent[4] = {0.47f,0.68f,0.86f,1.0f};
 
 namespace menu_state {
-	bool full_bright=false, zombie_ignore=false, god_mode=false;
+	bool full_bright=false, night_vision=false, zombie_ignore=false, god_mode=false;
 	bool anti_hunger=false, anti_encumbrance=false, anti_thirst=false;
 	bool auto_heal=false;
 	bool zombie_esp_enabled=true; float zombie_esp_max_dist=50.f;
@@ -48,6 +48,15 @@ namespace menu_state {
 	bool player_esp_enabled=true; float player_esp_max_dist=50.f;
 	bool player_esp_box=true, player_esp_name=true, player_esp_health=false, player_esp_show_dist=false;
 	float player_esp_color[4]={0.34f,0.78f,0.36f,1.0f};
+	bool vehicle_esp_enabled=false; float vehicle_esp_max_dist=80.f;
+	bool vehicle_esp_box=true, vehicle_esp_name=true, vehicle_esp_show_dist=true;
+	float vehicle_esp_color[4]={0.40f,0.70f,1.00f,1.0f};
+	bool animal_esp_enabled=false; float animal_esp_max_dist=60.f;
+	bool animal_esp_box=true, animal_esp_name=true, animal_esp_health=true, animal_esp_show_dist=false;
+	float animal_esp_color[4]={1.00f,0.85f,0.30f,1.0f};
+	bool item_esp_enabled=false; float item_esp_max_dist=30.f;
+	bool item_esp_name=true, item_esp_show_dist=false;
+	float item_esp_color[4]={0.80f,0.80f,0.80f,1.0f};
 	bool esp_render_enabled=true;
 	float menu_color[4]={0.47f,0.68f,0.86f,1.0f};
 	int menu_key=VK_INSERT;
@@ -127,6 +136,7 @@ void Menu::Render() {
 void Menu::Shutdown() {
 	isOpen=false;
 	menu_state::full_bright=false;
+	menu_state::night_vision=false;
 	menu_state::zombie_ignore=false;
 	menu_state::god_mode=false;
 	menu_state::anti_hunger=false;
@@ -143,6 +153,18 @@ void Menu::Shutdown() {
 	menu_state::player_esp_name=false;
 	menu_state::player_esp_health=false;
 	menu_state::player_esp_show_dist=false;
+	menu_state::vehicle_esp_enabled=false;
+	menu_state::vehicle_esp_box=false;
+	menu_state::vehicle_esp_name=false;
+	menu_state::vehicle_esp_show_dist=false;
+	menu_state::animal_esp_enabled=false;
+	menu_state::animal_esp_box=false;
+	menu_state::animal_esp_name=false;
+	menu_state::animal_esp_health=false;
+	menu_state::animal_esp_show_dist=false;
+	menu_state::item_esp_enabled=false;
+	menu_state::item_esp_name=false;
+	menu_state::item_esp_show_dist=false;
 	menu_state::esp_render_enabled=false;
 	g_entities.clear();
 	g_game_ready=false;
@@ -169,9 +191,10 @@ void Menu::General() {
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
 		}InsertEndGroupBoxLeft(ENCL("Weapon Cover"),ENCL("Weapon"));
 	}ImGui::NextColumn();{
-		InsertGroupBoxRight(ENCL("World"),180.f);{
+		InsertGroupBoxRight(ENCL("World"),210.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
 			InsertCheckbox("Full bright",menu_state::full_bright);
+			InsertCheckbox("Night vision",menu_state::night_vision);
 			InsertCheckbox("Zombies ignore",menu_state::zombie_ignore);
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
 		}InsertEndGroupBoxRight(ENCL("World Cover"),ENCL("World"));
@@ -179,8 +202,18 @@ void Menu::General() {
 		InsertGroupBoxRight(ENCL("Status"),220.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
 			ImGui::Text("Game: %s",g_game_ready?"ready":"waiting...");ImGui::Spacing();
-			int zc=0,pc=0;for(auto&e:g_entities){if(e.is_zombie)++zc;else++pc;}
-			ImGui::Text("Zombies: %d",zc);ImGui::Text("Players: %d",pc);
+			int zc=0,pc=0,vc=0,ac=0,ic=0;
+			for(auto&e:g_entities){
+				switch(e.type){
+				case pz::entity_type::zombie:++zc;break;
+				case pz::entity_type::player:++pc;break;
+				case pz::entity_type::vehicle:++vc;break;
+				case pz::entity_type::animal:++ac;break;
+				case pz::entity_type::item:++ic;break;
+				}
+			}
+			ImGui::Text("Zombies: %d  Players: %d",zc,pc);
+			ImGui::Text("Vehicles: %d  Animals: %d  Items: %d",vc,ac,ic);
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
 		}InsertEndGroupBoxRight(ENCL("Status Cover"),ENCL("Status"));
 	}ImGui::Columns(1);
@@ -190,32 +223,71 @@ void Menu::General() {
 void Menu::Visual() {
 	ImGuiStyle* style=&ImGui::GetStyle(); InsertSpacer("Top Spacer");
 	ImGui::Columns(2,NULL,false);{
-		InsertGroupBoxLeft(ENCL("Zombie ESP"),506.f);{
+		// ---- Left column: Zombie ESP + Animal ESP ----
+		InsertGroupBoxLeft(ENCL("Zombie ESP"),240.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
 			InsertCheckbox("Enabled",menu_state::zombie_esp_enabled);
-			{float t=menu_state::zombie_esp_max_dist;InsertSlider("Max distance",t,5.f,200.f,"%.0f");menu_state::zombie_esp_max_dist=t;}
-			InsertCheckbox("Box",menu_state::zombie_esp_box);
-			InsertCheckbox("Name",menu_state::zombie_esp_name);
-			InsertCheckbox("Health",menu_state::zombie_esp_health);
-			InsertCheckbox("Distance",menu_state::zombie_esp_show_dist);
+			{float t=menu_state::zombie_esp_max_dist;InsertSlider("Max distance##zd",t,5.f,200.f,"%.0f");menu_state::zombie_esp_max_dist=t;}
+			InsertCheckbox("Box##zb",menu_state::zombie_esp_box);
+			InsertCheckbox("Name##zn",menu_state::zombie_esp_name);
+			InsertCheckbox("Health##zh",menu_state::zombie_esp_health);
+			InsertCheckbox("Distance##zsd",menu_state::zombie_esp_show_dist);
 			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(CHECKBOX_LABEL_X);ImGui::Text("Color");
 			InsertColorPicker("##zcol",menu_state::zombie_esp_color,true);
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
 		}InsertEndGroupBoxLeft(ENCL("Zombie ESP Cover"),ENCL("Zombie ESP"));
-	}ImGui::NextColumn();{
-		InsertGroupBoxRight(ENCL("Player ESP"),506.f);{
+		InsertSpacer("ZA Spacer");
+		InsertGroupBoxLeft(ENCL("Animal ESP"),240.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
-			InsertCheckbox("Enabled",menu_state::player_esp_enabled);
-			{float t=menu_state::player_esp_max_dist;InsertSlider("Max distance",t,5.f,200.f,"%.0f");menu_state::player_esp_max_dist=t;}
-			InsertCheckbox("Box",menu_state::player_esp_box);
-			InsertCheckbox("Name",menu_state::player_esp_name);
-			InsertCheckbox("Health",menu_state::player_esp_health);
-			InsertCheckbox("Distance",menu_state::player_esp_show_dist);
+			InsertCheckbox("Enabled##ae",menu_state::animal_esp_enabled);
+			{float t=menu_state::animal_esp_max_dist;InsertSlider("Max distance##ad",t,5.f,200.f,"%.0f");menu_state::animal_esp_max_dist=t;}
+			InsertCheckbox("Box##ab",menu_state::animal_esp_box);
+			InsertCheckbox("Name##an",menu_state::animal_esp_name);
+			InsertCheckbox("Health##ah",menu_state::animal_esp_health);
+			InsertCheckbox("Distance##asd",menu_state::animal_esp_show_dist);
+			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(CHECKBOX_LABEL_X);ImGui::Text("Color");
+			InsertColorPicker("##acol",menu_state::animal_esp_color,true);
+			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
+		}InsertEndGroupBoxLeft(ENCL("Animal ESP Cover"),ENCL("Animal ESP"));
+	}ImGui::NextColumn();{
+		// ---- Right column: Player ESP + Vehicle ESP ----
+		InsertGroupBoxRight(ENCL("Player ESP"),240.f);{
+			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
+			InsertCheckbox("Enabled##pe",menu_state::player_esp_enabled);
+			{float t=menu_state::player_esp_max_dist;InsertSlider("Max distance##pd",t,5.f,200.f,"%.0f");menu_state::player_esp_max_dist=t;}
+			InsertCheckbox("Box##pb",menu_state::player_esp_box);
+			InsertCheckbox("Name##pn",menu_state::player_esp_name);
+			InsertCheckbox("Health##ph",menu_state::player_esp_health);
+			InsertCheckbox("Distance##psd",menu_state::player_esp_show_dist);
 			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(CHECKBOX_LABEL_X);ImGui::Text("Color");
 			InsertColorPicker("##pcol",menu_state::player_esp_color,true);
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
 		}InsertEndGroupBoxRight(ENCL("Player ESP Cover"),ENCL("Player ESP"));
+		InsertSpacer("PV Spacer");
+		InsertGroupBoxRight(ENCL("Vehicle ESP"),240.f);{
+			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
+			InsertCheckbox("Enabled##ve",menu_state::vehicle_esp_enabled);
+			{float t=menu_state::vehicle_esp_max_dist;InsertSlider("Max distance##vd",t,5.f,300.f,"%.0f");menu_state::vehicle_esp_max_dist=t;}
+			InsertCheckbox("Box##vb",menu_state::vehicle_esp_box);
+			InsertCheckbox("Name##vn",menu_state::vehicle_esp_name);
+			InsertCheckbox("Distance##vsd",menu_state::vehicle_esp_show_dist);
+			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(CHECKBOX_LABEL_X);ImGui::Text("Color");
+			InsertColorPicker("##vcol",menu_state::vehicle_esp_color,true);
+			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
+		}InsertEndGroupBoxRight(ENCL("Vehicle ESP Cover"),ENCL("Vehicle ESP"));
 	}ImGui::Columns(1);
+	// ---- Item ESP (full width below) ----
+	InsertSpacer("VI Spacer");
+	InsertGroupBoxTop(ENCL("Item ESP"),ImVec2(530.f,160.f));{
+		style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
+		InsertCheckbox("Enabled##ie",menu_state::item_esp_enabled);
+		{float t=menu_state::item_esp_max_dist;InsertSlider("Max distance##id",t,5.f,100.f,"%.0f");menu_state::item_esp_max_dist=t;}
+		InsertCheckbox("Name##in",menu_state::item_esp_name);
+		InsertCheckbox("Distance##isd",menu_state::item_esp_show_dist);
+		ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(CHECKBOX_LABEL_X);ImGui::Text("Color");
+		InsertColorPicker("##icol",menu_state::item_esp_color,true);
+		style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
+	}InsertEndGroupBoxTop(ENCL("Item ESP Cover"),ENCL("Item ESP"),ImVec2(530.f,11.f));
 }
 
 // ====================== Tab 2: Spawner (Elden Ring pattern) ========
@@ -360,11 +432,14 @@ void Menu::Spawner() {
 // ====================== Config IO (Elden Ring / cs2-6s pattern) ========
 namespace config_io {
 	struct config_data {
-		bool full_bright, zombie_ignore, god_mode;
+		bool full_bright, night_vision, zombie_ignore, god_mode;
 		bool anti_hunger, anti_encumbrance, anti_thirst;
 		bool auto_heal;
 		bool ze_en; float ze_dist; bool ze_box, ze_name, ze_hp, ze_sd; float ze_col[4];
 		bool pe_en; float pe_dist; bool pe_box, pe_name, pe_hp, pe_sd; float pe_col[4];
+		bool ve_en; float ve_dist; bool ve_box, ve_name, ve_sd; float ve_col[4];
+		bool ae_en; float ae_dist; bool ae_box, ae_name, ae_hp, ae_sd; float ae_col[4];
+		bool ie_en; float ie_dist; bool ie_name, ie_sd; float ie_col[4];
 		bool esp_render; float menu_col[4]; int menu_key;
 	};
 	static std::string sanitize(const std::string& in) {
@@ -383,7 +458,8 @@ namespace config_io {
 	}
 	static std::wstring default_marker() { return configs_dir()+L"\\default.txt"; }
 	static void pack(config_data& d) {
-		d.full_bright=menu_state::full_bright; d.zombie_ignore=menu_state::zombie_ignore; d.god_mode=menu_state::god_mode;
+		d.full_bright=menu_state::full_bright; d.night_vision=menu_state::night_vision;
+		d.zombie_ignore=menu_state::zombie_ignore; d.god_mode=menu_state::god_mode;
 		d.anti_hunger=menu_state::anti_hunger; d.anti_encumbrance=menu_state::anti_encumbrance; d.anti_thirst=menu_state::anti_thirst;
 		d.auto_heal=menu_state::auto_heal;
 		d.ze_en=menu_state::zombie_esp_enabled; d.ze_dist=menu_state::zombie_esp_max_dist;
@@ -394,11 +470,23 @@ namespace config_io {
 		d.pe_box=menu_state::player_esp_box; d.pe_name=menu_state::player_esp_name;
 		d.pe_hp=menu_state::player_esp_health; d.pe_sd=menu_state::player_esp_show_dist;
 		memcpy(d.pe_col,menu_state::player_esp_color,16);
+		d.ve_en=menu_state::vehicle_esp_enabled; d.ve_dist=menu_state::vehicle_esp_max_dist;
+		d.ve_box=menu_state::vehicle_esp_box; d.ve_name=menu_state::vehicle_esp_name;
+		d.ve_sd=menu_state::vehicle_esp_show_dist;
+		memcpy(d.ve_col,menu_state::vehicle_esp_color,16);
+		d.ae_en=menu_state::animal_esp_enabled; d.ae_dist=menu_state::animal_esp_max_dist;
+		d.ae_box=menu_state::animal_esp_box; d.ae_name=menu_state::animal_esp_name;
+		d.ae_hp=menu_state::animal_esp_health; d.ae_sd=menu_state::animal_esp_show_dist;
+		memcpy(d.ae_col,menu_state::animal_esp_color,16);
+		d.ie_en=menu_state::item_esp_enabled; d.ie_dist=menu_state::item_esp_max_dist;
+		d.ie_name=menu_state::item_esp_name; d.ie_sd=menu_state::item_esp_show_dist;
+		memcpy(d.ie_col,menu_state::item_esp_color,16);
 		d.esp_render=menu_state::esp_render_enabled;
 		memcpy(d.menu_col,menu_state::menu_color,16); d.menu_key=menu_state::menu_key;
 	}
 	static void unpack(const config_data& d) {
-		menu_state::full_bright=d.full_bright; menu_state::zombie_ignore=d.zombie_ignore; menu_state::god_mode=d.god_mode;
+		menu_state::full_bright=d.full_bright; menu_state::night_vision=d.night_vision;
+		menu_state::zombie_ignore=d.zombie_ignore; menu_state::god_mode=d.god_mode;
 		menu_state::anti_hunger=d.anti_hunger; menu_state::anti_encumbrance=d.anti_encumbrance; menu_state::anti_thirst=d.anti_thirst;
 		menu_state::auto_heal=d.auto_heal;
 		menu_state::zombie_esp_enabled=d.ze_en; menu_state::zombie_esp_max_dist=d.ze_dist;
@@ -409,6 +497,17 @@ namespace config_io {
 		menu_state::player_esp_box=d.pe_box; menu_state::player_esp_name=d.pe_name;
 		menu_state::player_esp_health=d.pe_hp; menu_state::player_esp_show_dist=d.pe_sd;
 		memcpy(menu_state::player_esp_color,d.pe_col,16);
+		menu_state::vehicle_esp_enabled=d.ve_en; menu_state::vehicle_esp_max_dist=d.ve_dist;
+		menu_state::vehicle_esp_box=d.ve_box; menu_state::vehicle_esp_name=d.ve_name;
+		menu_state::vehicle_esp_show_dist=d.ve_sd;
+		memcpy(menu_state::vehicle_esp_color,d.ve_col,16);
+		menu_state::animal_esp_enabled=d.ae_en; menu_state::animal_esp_max_dist=d.ae_dist;
+		menu_state::animal_esp_box=d.ae_box; menu_state::animal_esp_name=d.ae_name;
+		menu_state::animal_esp_health=d.ae_hp; menu_state::animal_esp_show_dist=d.ae_sd;
+		memcpy(menu_state::animal_esp_color,d.ae_col,16);
+		menu_state::item_esp_enabled=d.ie_en; menu_state::item_esp_max_dist=d.ie_dist;
+		menu_state::item_esp_name=d.ie_name; menu_state::item_esp_show_dist=d.ie_sd;
+		memcpy(menu_state::item_esp_color,d.ie_col,16);
 		menu_state::esp_render_enabled=d.esp_render;
 		memcpy(menu_state::menu_color,d.menu_col,16); menu_state::menu_key=d.menu_key;
 		if(menu_state::menu_color[3]<=0.f)menu_state::menu_color[3]=1.f;
@@ -554,27 +653,63 @@ void DrawOverlay(){
 	if(menu_state::esp_render_enabled&&g_game_ready){
 		for(auto&e:g_entities){
 			if(e.is_local||!e.on_screen)continue;
-			bool z=e.is_zombie;
-			if(!(z?menu_state::zombie_esp_enabled:menu_state::player_esp_enabled))continue;
-			if(e.dist>(z?menu_state::zombie_esp_max_dist:menu_state::player_esp_max_dist))continue;
-			const float*cc=z?menu_state::zombie_esp_color:menu_state::player_esp_color;
+			const bool z=(e.type==pz::entity_type::zombie);
+			const bool p=(e.type==pz::entity_type::player);
+			const bool v=(e.type==pz::entity_type::vehicle);
+			const bool a=(e.type==pz::entity_type::animal);
+			const bool it=(e.type==pz::entity_type::item);
+
+			bool enabled=false; float max_d=0; bool show_box=false,show_name=false,show_hp=false,show_dist=false;
+			const float*cc=nullptr;
+			if(z){enabled=menu_state::zombie_esp_enabled;max_d=menu_state::zombie_esp_max_dist;show_box=menu_state::zombie_esp_box;show_name=menu_state::zombie_esp_name;show_hp=menu_state::zombie_esp_health;show_dist=menu_state::zombie_esp_show_dist;cc=menu_state::zombie_esp_color;}
+			else if(p){enabled=menu_state::player_esp_enabled;max_d=menu_state::player_esp_max_dist;show_box=menu_state::player_esp_box;show_name=menu_state::player_esp_name;show_hp=menu_state::player_esp_health;show_dist=menu_state::player_esp_show_dist;cc=menu_state::player_esp_color;}
+			else if(v){enabled=menu_state::vehicle_esp_enabled;max_d=menu_state::vehicle_esp_max_dist;show_box=menu_state::vehicle_esp_box;show_name=menu_state::vehicle_esp_name;show_hp=false;show_dist=menu_state::vehicle_esp_show_dist;cc=menu_state::vehicle_esp_color;}
+			else if(a){enabled=menu_state::animal_esp_enabled;max_d=menu_state::animal_esp_max_dist;show_box=menu_state::animal_esp_box;show_name=menu_state::animal_esp_name;show_hp=menu_state::animal_esp_health;show_dist=menu_state::animal_esp_show_dist;cc=menu_state::animal_esp_color;}
+			else if(it){enabled=menu_state::item_esp_enabled;max_d=menu_state::item_esp_max_dist;show_box=false;show_name=menu_state::item_esp_name;show_hp=false;show_dist=menu_state::item_esp_show_dist;cc=menu_state::item_esp_color;}
+			if(!enabled||e.dist>max_d||!cc)continue;
+
 			ImU32 col=IM_COL32((int)(cc[0]*255),(int)(cc[1]*255),(int)(cc[2]*255),(int)(cc[3]*255));
-			if(z?menu_state::zombie_esp_box:menu_state::player_esp_box)
-				bg->AddRect(ImVec2(e.sx-14,e.sy-56),ImVec2(e.sx+14,e.sy),col,0,0,1.5f);
-			float ty=e.sy-60;
-			if(z?menu_state::zombie_esp_name:menu_state::player_esp_name){
-				bg->AddText(ImVec2(e.sx-13,ty+1),IM_COL32(0,0,0,180),e.name);
-				bg->AddText(ImVec2(e.sx-14,ty),IM_COL32(255,255,255,255),e.name);ty-=14;
+			ImU32 shadow=IM_COL32(0,0,0,180);
+			float bw=14.0f, bh=(z||p)?56.0f:v?40.0f:a?36.0f:0.0f;
+
+			// Cornered box (CS2 style)
+			if(show_box&&bh>0){
+				float x1=e.sx-bw,y1=e.sy-bh,x2=e.sx+bw,y2=e.sy;
+				float cl=std::min(10.0f,(x2-x1)*0.3f);
+				bg->AddLine(ImVec2(x1,y1),ImVec2(x1+cl,y1),col,2.f);
+				bg->AddLine(ImVec2(x1,y1),ImVec2(x1,y1+cl),col,2.f);
+				bg->AddLine(ImVec2(x2,y1),ImVec2(x2-cl,y1),col,2.f);
+				bg->AddLine(ImVec2(x2,y1),ImVec2(x2,y1+cl),col,2.f);
+				bg->AddLine(ImVec2(x1,y2),ImVec2(x1+cl,y2),col,2.f);
+				bg->AddLine(ImVec2(x1,y2),ImVec2(x1,y2-cl),col,2.f);
+				bg->AddLine(ImVec2(x2,y2),ImVec2(x2-cl,y2),col,2.f);
+				bg->AddLine(ImVec2(x2,y2),ImVec2(x2,y2-cl),col,2.f);
+				// Health bar left side
+				if(show_hp&&e.health>0){
+					float fill=std::clamp(e.health/100.0f,0.0f,1.0f);
+					float bx=x1-6;
+					bg->AddRectFilled(ImVec2(bx-2,y1),ImVec2(bx,y2),IM_COL32(0,0,0,120));
+					ImU32 bc=IM_COL32((int)((1.f-fill)*255),(int)(fill*255),0,255);
+					bg->AddRectFilled(ImVec2(bx-2,y1+bh*(1-fill)),ImVec2(bx,y2),bc);
+				}
 			}
-			if(z?menu_state::zombie_esp_health:menu_state::player_esp_health){
-				char h[32];_snprintf_s(h,sizeof(h),_TRUNCATE,"%.0f hp",e.health);
-				bg->AddText(ImVec2(e.sx-13,ty+1),IM_COL32(0,0,0,180),h);
-				bg->AddText(ImVec2(e.sx-14,ty),IM_COL32(255,255,255,255),h);ty-=14;
+			// Name centered above
+			float ty=e.sy-bh-4;
+			if(show_name){
+				ImVec2 ts=ImGui::CalcTextSize(e.name);
+				float tx=e.sx-ts.x*0.5f;
+				bg->AddText(ImVec2(tx+1,ty+1),shadow,e.name);
+				bg->AddText(ImVec2(tx,ty),IM_COL32(255,255,255,230),e.name);
+				ty-=14;
 			}
-			if(z?menu_state::zombie_esp_show_dist:menu_state::player_esp_show_dist){
+			// Distance centered below
+			if(show_dist){
 				char d[32];_snprintf_s(d,sizeof(d),_TRUNCATE,"%.0fm",e.dist);
-				bg->AddText(ImVec2(e.sx-13,ty+1),IM_COL32(0,0,0,180),d);
-				bg->AddText(ImVec2(e.sx-14,ty),IM_COL32(255,255,255,255),d);
+				ImVec2 ds=ImGui::CalcTextSize(d);
+				float dx=e.sx-ds.x*0.5f;
+				float dy=e.sy+4;
+				bg->AddText(ImVec2(dx+1,dy+1),shadow,d);
+				bg->AddText(ImVec2(dx,dy),IM_COL32(200,200,200,200),d);
 			}
 		}
 	}

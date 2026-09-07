@@ -25,6 +25,7 @@ extern bool g_game_ready;
 
 namespace menu_state {
 	extern bool full_bright;
+	extern bool night_vision;
 	extern bool zombie_ignore;
 	extern bool god_mode;
 	extern bool anti_hunger;
@@ -47,6 +48,27 @@ namespace menu_state {
 	extern bool  player_esp_health;
 	extern bool  player_esp_show_dist;
 	extern float player_esp_color[4];
+
+	extern bool  vehicle_esp_enabled;
+	extern float vehicle_esp_max_dist;
+	extern bool  vehicle_esp_box;
+	extern bool  vehicle_esp_name;
+	extern bool  vehicle_esp_show_dist;
+	extern float vehicle_esp_color[4];
+
+	extern bool  animal_esp_enabled;
+	extern float animal_esp_max_dist;
+	extern bool  animal_esp_box;
+	extern bool  animal_esp_name;
+	extern bool  animal_esp_health;
+	extern bool  animal_esp_show_dist;
+	extern float animal_esp_color[4];
+
+	extern bool  item_esp_enabled;
+	extern float item_esp_max_dist;
+	extern bool  item_esp_name;
+	extern bool  item_esp_show_dist;
+	extern float item_esp_color[4];
 
 	extern bool  esp_render_enabled;
 	extern float menu_color[4];

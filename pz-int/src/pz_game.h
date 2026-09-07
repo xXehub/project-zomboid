@@ -17,7 +17,16 @@
 
 namespace pz {
 
-    // One world entity (zombie or player) collected per frame.
+    // Entity classification for the ESP overlay.
+    enum class entity_type : uint8_t {
+        zombie,
+        player,
+        vehicle,
+        animal,
+        item
+    };
+
+    // One world entity collected per frame.
     struct entity {
         // world position (isometric tile coords)
         float wx{ 0.0f };
@@ -33,7 +42,7 @@ namespace pz {
         // display name (UTF-8, from descriptor/username)
         char name[ 64 ]{};
         float health{ 0.0f };
-        bool is_zombie{ false };
+        entity_type type{ entity_type::zombie };
         bool is_local{ false };
     };
 
@@ -77,6 +86,7 @@ namespace pz {
 
 	struct survival_features {
 		bool full_bright{ false };
+		bool night_vision{ false };
 		bool zombie_ignore{ false };
 		bool god_mode{ false };
 		bool anti_hunger{ false };
