@@ -1,0 +1,33 @@
+# Build artifacts
+*.obj
+*.pdb
+*.ilk
+*.iobj
+*.ipdb
+*.lib
+*.exp
+*.dll
+*.exe
+*.tlog/
+*.recipe
+*.log
+
+# Directories
+pz-int/intermediates/
+pz-int/release/
+source-uc/target/
+
+# IDE
+.vs/
+*.user
+*.suo
+*.ncb
+*.sdf
+*.opensdf
+.idea/
+*.iml
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store

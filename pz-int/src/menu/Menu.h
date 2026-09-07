@@ -1,0 +1,54 @@
+#pragma once
+#include "imgui.h"
+#include <vector>
+#include <string>
+#include "pz_game.h"
+
+class Menu {
+public:
+	static Menu& Get() { static Menu m; return m; }
+	void Render();
+	void Shutdown();
+	void ColorPicker(const char* name, float* color, bool alpha);
+
+	void General();    // tab 0
+	void Visual();     // tab 1
+	void Spawner();    // tab 2
+	void Settings();   // tab 3
+
+	bool isOpen = false;
+};
+
+void DrawOverlay();
+extern std::vector< pz::entity > g_entities;
+extern bool g_game_ready;
+
+namespace menu_state {
+	extern bool full_bright;
+	extern bool zombie_ignore;
+	extern bool god_mode;
+	extern bool anti_hunger;
+	extern bool anti_encumbrance;
+	extern bool anti_thirst;
+	extern bool auto_heal;
+
+	extern bool  zombie_esp_enabled;
+	extern float zombie_esp_max_dist;
+	extern bool  zombie_esp_box;
+	extern bool  zombie_esp_name;
+	extern bool  zombie_esp_health;
+	extern bool  zombie_esp_show_dist;
+	extern float zombie_esp_color[4];
+
+	extern bool  player_esp_enabled;
+	extern float player_esp_max_dist;
+	extern bool  player_esp_box;
+	extern bool  player_esp_name;
+	extern bool  player_esp_health;
+	extern bool  player_esp_show_dist;
+	extern float player_esp_color[4];
+
+	extern bool  esp_render_enabled;
+	extern float menu_color[4];
+	extern int   menu_key;
+}
