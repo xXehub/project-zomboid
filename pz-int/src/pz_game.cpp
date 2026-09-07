@@ -2024,34 +2024,33 @@ namespace pz {
     {
         if (!pzj::ensure_resolved()) return;
 
-        using clock = std::chrono::steady_clock;
-        static auto next_hold = clock::time_point{};
-        const auto now = clock::now();
-        const bool changed = !same_features(features, g_last_features);
-        if (!changed && now < next_hold) return;
-
         pzj::jframe frame{ 64 };
         if (!frame.ok) return;
 
-        // Full bright wins over night vision; both use the same climate state.
+        // Climate override must run EVERY frame (no throttle) because the
+        // game server overwrites climate values every tick. If we only set
+        // them at 10Hz the server wins in between and the effect flickers.
         const bool want_climate = features.full_bright ||
             (features.night_vision && !features.full_bright);
         const bool had_climate = g_last_features.full_bright ||
             g_last_features.night_vision;
         if (want_climate || had_climate) {
             if (features.full_bright) {
-                // Full daylight override
                 static_cast<void>(apply_climate_override(true));
             } else if (features.night_vision) {
-                // Partial night vision: enhanced ambient without full daylight
-                // desat=0, globalLight=0.85, night=0.2, ambient=0.7, viewDist=0.9, dayLight=0.5
                 constexpr std::array<float, 6> nv{ 0.0f, 0.85f, 0.2f, 0.7f, 0.9f, 0.5f };
                 static_cast<void>(apply_climate_override(true, nv));
             } else {
-                // Restore original
                 static_cast<void>(apply_climate_override(false));
             }
         }
+
+        // Throttle everything else to 10Hz (100ms)
+        using clock = std::chrono::steady_clock;
+        static auto next_hold = clock::time_point{};
+        const auto now = clock::now();
+        const bool changed = !same_features(features, g_last_features);
+        if (!changed && now < next_hold) return;
 
         if (features.zombie_ignore && !g_zombie_state_saved &&
             g_m.system_zombiesDontAttack) {

@@ -648,68 +648,64 @@ void Menu::Settings() {
 
 // ====================== ESP Overlay ===============================
 void DrawOverlay(){
-	ImDrawList*bg=ImGui::GetBackgroundDrawList();
 	ImDrawList*fg=ImGui::GetForegroundDrawList();
 	if(menu_state::esp_render_enabled&&g_game_ready){
 		for(auto&e:g_entities){
 			if(e.is_local||!e.on_screen)continue;
+			// Skip NaN positions (unloaded animals etc)
+			if(e.sx!=e.sx||e.sy!=e.sy||e.dist!=e.dist)continue;
 			const bool z=(e.type==pz::entity_type::zombie);
 			const bool p=(e.type==pz::entity_type::player);
 			const bool v=(e.type==pz::entity_type::vehicle);
 			const bool a=(e.type==pz::entity_type::animal);
 			const bool it=(e.type==pz::entity_type::item);
-
 			bool enabled=false; float max_d=0; bool show_box=false,show_name=false,show_hp=false,show_dist=false;
 			const float*cc=nullptr;
 			if(z){enabled=menu_state::zombie_esp_enabled;max_d=menu_state::zombie_esp_max_dist;show_box=menu_state::zombie_esp_box;show_name=menu_state::zombie_esp_name;show_hp=menu_state::zombie_esp_health;show_dist=menu_state::zombie_esp_show_dist;cc=menu_state::zombie_esp_color;}
 			else if(p){enabled=menu_state::player_esp_enabled;max_d=menu_state::player_esp_max_dist;show_box=menu_state::player_esp_box;show_name=menu_state::player_esp_name;show_hp=menu_state::player_esp_health;show_dist=menu_state::player_esp_show_dist;cc=menu_state::player_esp_color;}
-			else if(v){enabled=menu_state::vehicle_esp_enabled;max_d=menu_state::vehicle_esp_max_dist;show_box=menu_state::vehicle_esp_box;show_name=menu_state::vehicle_esp_name;show_hp=false;show_dist=menu_state::vehicle_esp_show_dist;cc=menu_state::vehicle_esp_color;}
+			else if(v){enabled=menu_state::vehicle_esp_enabled;max_d=menu_state::vehicle_esp_max_dist;show_box=menu_state::vehicle_esp_box;show_name=menu_state::vehicle_esp_name;show_hp=true;show_dist=menu_state::vehicle_esp_show_dist;cc=menu_state::vehicle_esp_color;}
 			else if(a){enabled=menu_state::animal_esp_enabled;max_d=menu_state::animal_esp_max_dist;show_box=menu_state::animal_esp_box;show_name=menu_state::animal_esp_name;show_hp=menu_state::animal_esp_health;show_dist=menu_state::animal_esp_show_dist;cc=menu_state::animal_esp_color;}
 			else if(it){enabled=menu_state::item_esp_enabled;max_d=menu_state::item_esp_max_dist;show_box=false;show_name=menu_state::item_esp_name;show_hp=false;show_dist=menu_state::item_esp_show_dist;cc=menu_state::item_esp_color;}
 			if(!enabled||e.dist>max_d||!cc)continue;
-
 			ImU32 col=IM_COL32((int)(cc[0]*255),(int)(cc[1]*255),(int)(cc[2]*255),(int)(cc[3]*255));
-			ImU32 shadow=IM_COL32(0,0,0,180);
+			ImU32 shadow=IM_COL32(0,0,0,200);
 			float bw=14.0f, bh=(z||p)?56.0f:v?40.0f:a?36.0f:0.0f;
-
-			// Cornered box (CS2 style)
+			// Cornered box with outline shadow
 			if(show_box&&bh>0){
 				float x1=e.sx-bw,y1=e.sy-bh,x2=e.sx+bw,y2=e.sy;
 				float cl=std::min(10.0f,(x2-x1)*0.3f);
-				bg->AddLine(ImVec2(x1,y1),ImVec2(x1+cl,y1),col,2.f);
-				bg->AddLine(ImVec2(x1,y1),ImVec2(x1,y1+cl),col,2.f);
-				bg->AddLine(ImVec2(x2,y1),ImVec2(x2-cl,y1),col,2.f);
-				bg->AddLine(ImVec2(x2,y1),ImVec2(x2,y1+cl),col,2.f);
-				bg->AddLine(ImVec2(x1,y2),ImVec2(x1+cl,y2),col,2.f);
-				bg->AddLine(ImVec2(x1,y2),ImVec2(x1,y2-cl),col,2.f);
-				bg->AddLine(ImVec2(x2,y2),ImVec2(x2-cl,y2),col,2.f);
-				bg->AddLine(ImVec2(x2,y2),ImVec2(x2,y2-cl),col,2.f);
-				// Health bar left side
+				auto corner=[&](float ax,float ay,float bx_,float by_,float cx,float cy,float dx,float dy){
+					fg->AddLine(ImVec2(ax,ay),ImVec2(bx_,by_),shadow,3.f);
+					fg->AddLine(ImVec2(cx,cy),ImVec2(dx,dy),shadow,3.f);
+					fg->AddLine(ImVec2(ax,ay),ImVec2(bx_,by_),col,1.5f);
+					fg->AddLine(ImVec2(cx,cy),ImVec2(dx,dy),col,1.5f);
+				};
+				corner(x1,y1,x1+cl,y1, x1,y1,x1,y1+cl);
+				corner(x2,y1,x2-cl,y1, x2,y1,x2,y1+cl);
+				corner(x1,y2,x1+cl,y2, x1,y2,x1,y2-cl);
+				corner(x2,y2,x2-cl,y2, x2,y2,x2,y2-cl);
 				if(show_hp&&e.health>0){
 					float fill=std::clamp(e.health/100.0f,0.0f,1.0f);
-					float bx=x1-6;
-					bg->AddRectFilled(ImVec2(bx-2,y1),ImVec2(bx,y2),IM_COL32(0,0,0,120));
+					float bx=x1-7;
+					fg->AddRectFilled(ImVec2(bx-3,y1-1),ImVec2(bx+1,y2+1),IM_COL32(0,0,0,160));
 					ImU32 bc=IM_COL32((int)((1.f-fill)*255),(int)(fill*255),0,255);
-					bg->AddRectFilled(ImVec2(bx-2,y1+bh*(1-fill)),ImVec2(bx,y2),bc);
+					fg->AddRectFilled(ImVec2(bx-2,y1+bh*(1-fill)),ImVec2(bx,y2),bc);
 				}
 			}
-			// Name centered above
 			float ty=e.sy-bh-4;
 			if(show_name){
 				ImVec2 ts=ImGui::CalcTextSize(e.name);
 				float tx=e.sx-ts.x*0.5f;
-				bg->AddText(ImVec2(tx+1,ty+1),shadow,e.name);
-				bg->AddText(ImVec2(tx,ty),IM_COL32(255,255,255,230),e.name);
+				fg->AddText(ImVec2(tx+1,ty+1),shadow,e.name);
+				fg->AddText(ImVec2(tx,ty),IM_COL32(255,255,255,230),e.name);
 				ty-=14;
 			}
-			// Distance centered below
 			if(show_dist){
 				char d[32];_snprintf_s(d,sizeof(d),_TRUNCATE,"%.0fm",e.dist);
 				ImVec2 ds=ImGui::CalcTextSize(d);
-				float dx=e.sx-ds.x*0.5f;
-				float dy=e.sy+4;
-				bg->AddText(ImVec2(dx+1,dy+1),shadow,d);
-				bg->AddText(ImVec2(dx,dy),IM_COL32(200,200,200,200),d);
+				float dx=e.sx-ds.x*0.5f,dy=e.sy+4;
+				fg->AddText(ImVec2(dx+1,dy+1),shadow,d);
+				fg->AddText(ImVec2(dx,dy),IM_COL32(200,200,200,200),d);
 			}
 		}
 	}
