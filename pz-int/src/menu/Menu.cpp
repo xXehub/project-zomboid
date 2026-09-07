@@ -709,6 +709,22 @@ void DrawOverlay(){
 			}
 		}
 	}
+	// ESP rendering test: bright indicators to verify draw list works
+	if(menu_state::esp_render_enabled&&g_game_ready&&!g_entities.empty()){
+		// Draw entity count in top-right corner (always visible proof ESP is running)
+		char esp_info[128];
+		int eon=0; for(auto&e:g_entities) if(e.on_screen&&e.dist==e.dist) ++eon;
+		_snprintf_s(esp_info,sizeof(esp_info),_TRUNCATE,"ESP: %d/%d on-screen",(int)eon,(int)g_entities.size());
+		fg->AddRectFilled(ImVec2(1500,20),ImVec2(1900,42),IM_COL32(0,0,0,180));
+		fg->AddText(ImVec2(1505,23),IM_COL32(0,255,0,255),esp_info);
+		// Draw bright crosshair at each on-screen entity position
+		for(auto&e:g_entities){
+			if(!e.on_screen||e.sx!=e.sx||e.sy!=e.sy)continue;
+			fg->AddLine(ImVec2(e.sx-20,e.sy),ImVec2(e.sx+20,e.sy),IM_COL32(255,0,0,255),3.f);
+			fg->AddLine(ImVec2(e.sx,e.sy-20),ImVec2(e.sx,e.sy+20),IM_COL32(255,0,0,255),3.f);
+			fg->AddCircle(ImVec2(e.sx,e.sy),25.f,IM_COL32(255,255,0,255),12,2.f);
+		}
+	}
 	{// Watermark
 		const char*t="pz-int";ImVec2 ts=ImGui::CalcTextSize(t);
 		float w=ts.x+16,h=ts.y+16;ImVec2 p(20,20);
