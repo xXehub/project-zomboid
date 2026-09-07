@@ -116,6 +116,10 @@ namespace pz {
         char last_spawn_result[128];
     };
     debug_info get_debug_info( );
+    // Write a deep diagnostic dump to %TEMP%/pzint_dump.txt.
+    // Tests every JNI method, reads live climate state, attempts a one-shot
+    // fullbright toggle, and reports everything.
+    void dump_deep_debug( const std::vector< entity >& entities );
     void refill_ammo( );
 
 } // namespace pz

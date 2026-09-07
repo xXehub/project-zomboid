@@ -798,6 +798,17 @@ void Menu::Debug() {
 		ImGui::Text("Auto heal: %s", menu_state::auto_heal?"ON":"off");
 		ImGui::Text("Zombie ignore: %s", menu_state::zombie_ignore?"ON":"off");
 		ImGui::Text("ESP render: %s", menu_state::esp_render_enabled?"ON":"off");
+		ImGui::Spacing();ImGui::Spacing();
+
+		// Big red DUMP button
+		ImGui::PushStyleColor(ImGuiCol_Button,ImColor(120,30,30,255).Value);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImColor(160,40,40,255).Value);
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImColor(80,20,20,255).Value);
+		if(ImGui::Button("DUMP DEEP DEBUG TO FILE",ImVec2(520.f,30.f))){
+			pz::dump_deep_debug(g_entities);
+		}
+		ImGui::PopStyleColor(3);
+		ImGui::TextDisabled("Writes to %%TEMP%%\\pzint_dump.txt");
 	}ImGui::EndChild();
 	ImGui::PopStyleColor();
 }

@@ -1547,6 +1547,178 @@ namespace pz {
         return d;
     }
 
+    void dump_deep_debug(const std::vector<entity>& entities)
+    {
+        wchar_t temp[MAX_PATH]{};
+        ::GetTempPathW(MAX_PATH, temp);
+        std::wstring path = std::wstring(temp) + L"pzint_dump.txt";
+        FILE* f = nullptr;
+        ::_wfopen_s(&f, path.c_str(), L"wt");
+        if (!f) return;
+
+        auto w = [&](const char* fmt, ...) {
+            va_list ap; va_start(ap, fmt);
+            char buf[2048]; ::_vsnprintf_s(buf, sizeof(buf), _TRUNCATE, fmt, ap);
+            va_end(ap);
+            std::fputs(buf, f); std::fputs("\n", f);
+        };
+
+        w("=== pz-int DEEP DEBUG DUMP ===");
+        w("timestamp: render frame");
+        w("");
+
+        // ---- JNI state ----
+        w("=== JNI STATE ===");
+        w("g_env: %p", pzj::g_env);
+        w("g_vm: %p", pzj::g_vm);
+        w("g_class_loader: %p", pzj::g_class_loader);
+        w("g_load_class: %p", pzj::g_load_class);
+        w("g_resolved: %d", pzj::g_resolved ? 1 : 0);
+        w("g_attach_failed: %d", pzj::g_attach_failed ? 1 : 0);
+        w("");
+
+        // ---- All class resolution ----
+        w("=== CLASSES (null = FAILED) ===");
+        #define CLS(name) w("  " #name ": %p", g_cls.name)
+        CLS(isoPlayer); CLS(isoZombie); CLS(isoGameCharacter); CLS(isoMovingObject);
+        CLS(isoWorld); CLS(isoCell); CLS(isoCamera); CLS(gameClient);
+        CLS(climateManager); CLS(climateFloat); CLS(scriptManager); CLS(itemScript);
+        CLS(inventoryItem); CLS(itemContainer); CLS(handWeapon); CLS(itemFactory);
+        CLS(bodyDamage); CLS(bodyPart); CLS(bodyPartType); CLS(stats);
+        CLS(characterStat); CLS(systemDisabler); CLS(core);
+        CLS(vehicleManager); CLS(baseVehicle); CLS(isoAnimal);
+        CLS(worldInventoryObject); CLS(isoUtils);
+        #undef CLS
+        w("");
+
+        // ---- All method resolution ----
+        w("=== METHODS (null = FAILED) ===");
+        #define MTD(name) w("  " #name ": %p", (void*)g_m.name)
+        MTD(player_getInstance); MTD(player_getPlayerNum);
+        MTD(char_getX); MTD(char_getY); MTD(char_getZ);
+        MTD(char_getName); MTD(char_getHealth); MTD(char_getInventory);
+        MTD(char_setHealth); MTD(char_getMaxWeight); MTD(char_setMaxWeight);
+        MTD(char_invincible); MTD(char_getBodyDamage); MTD(char_getStats);
+        MTD(cam_getOffX); MTD(cam_getOffY); MTD(core_getInstance);
+        MTD(core_getScreenWidth); MTD(core_getScreenHeight); MTD(core_tileScale);
+        MTD(core_getZoom);
+        w("  -- climate --");
+        MTD(climate_getInstance); MTD(climate_getFloat);
+        MTD(climate_desaturationMember); MTD(climate_globalLightIntensityMember);
+        MTD(climate_nightStrengthMember); MTD(climate_ambientMember);
+        MTD(climate_viewDistanceMember); MTD(climate_dayLightStrengthMember);
+        MTD(climate_override); MTD(climate_interpolate);
+        MTD(climate_isOverride); MTD(climate_isOverrideValue); MTD(climate_finalValue);
+        MTD(climatefloat_setOverride); MTD(climatefloat_setEnableOverride);
+        MTD(climatefloat_setFinalValue);
+        w("  -- container sync --");
+        MTD(container_AddItem_str); MTD(container_setDirty);
+        MTD(container_setDrawDirty); MTD(container_requestSync);
+        w("  -- isoutils --");
+        MTD(isoutils_XToScreenExact); MTD(isoutils_YToScreenExact);
+        w("  -- stats --");
+        MTD(stats_set); MTD(stat_hunger); MTD(stat_thirst);
+        MTD(stat_sickness); MTD(stat_pain); MTD(system_zombiesDontAttack);
+        w("  -- vehicle --");
+        MTD(vehiclemanager_instance); MTD(vehiclemanager_getVehicles);
+        MTD(vehicle_getScriptName);
+        w("  -- animal --");
+        MTD(animal_getAnimalType);
+        w("  -- world inv --");
+        MTD(worldinvobj_getItem); MTD(worldinvobj_getWorldPosX);
+        MTD(invitem_getDisplayName);
+        #undef MTD
+        w("");
+
+        // ---- Live climate state ----
+        w("=== LIVE CLIMATE STATE ===");
+        if (pzj::g_resolved && g_m.climate_getInstance && g_cls.climateManager) {
+            pzj::jframe frame{ 64 };
+            if (frame.ok) {
+                const auto mgr = static_cast<jobject>(
+                    g_env->CallStaticObjectMethod(g_cls.climateManager, g_m.climate_getInstance));
+                if (!g_env->ExceptionCheck() && mgr) {
+                    const char* names[] = {"desaturation","globalLightIntensity","nightStrength","ambient","viewDistance","dayLightStrength"};
+                    const jfieldID flds[] = {
+                        g_m.climate_desaturationMember, g_m.climate_globalLightIntensityMember,
+                        g_m.climate_nightStrengthMember, g_m.climate_ambientMember,
+                        g_m.climate_viewDistanceMember, g_m.climate_dayLightStrengthMember
+                    };
+                    for (int i = 0; i < 6; ++i) {
+                        if (!flds[i]) { w("  %s: FIELD_NULL", names[i]); continue; }
+                        const auto cf = static_cast<jobject>(g_env->GetObjectField(mgr, flds[i]));
+                        if (!cf || g_env->ExceptionCheck()) {
+                            g_env->ExceptionClear();
+                            w("  %s: GET_FAILED", names[i]);
+                            continue;
+                        }
+                        float ov = g_env->GetFloatField(cf, g_m.climate_override);
+                        float fv = g_env->GetFloatField(cf, g_m.climate_finalValue);
+                        float ip = g_env->GetFloatField(cf, g_m.climate_interpolate);
+                        jboolean io = g_env->GetBooleanField(cf, g_m.climate_isOverride);
+                        if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+                        w("  %s: override=%.3f final=%.3f interp=%.3f isOverride=%d",
+                            names[i], ov, fv, ip, io ? 1 : 0);
+
+                        // TEST: try setting override via method API right now
+                        if (g_m.climatefloat_setEnableOverride && g_m.climatefloat_setOverride) {
+                            g_env->CallVoidMethod(cf, g_m.climatefloat_setOverride, 1.0f, 1.0f);
+                            g_env->CallVoidMethod(cf, g_m.climatefloat_setEnableOverride, JNI_TRUE);
+                            bool exc = g_env->ExceptionCheck();
+                            if (exc) g_env->ExceptionClear();
+                            // Read back
+                            float ov2 = g_env->GetFloatField(cf, g_m.climate_override);
+                            jboolean io2 = g_env->GetBooleanField(cf, g_m.climate_isOverride);
+                            if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+                            w("    -> TEST setOverride(1.0,1.0)+setEnableOverride(true): exc=%d override=%.3f isOverride=%d",
+                                exc?1:0, ov2, io2?1:0);
+                            // Restore original
+                            g_env->CallVoidMethod(cf, g_m.climatefloat_setOverride, ov, ip);
+                            g_env->CallVoidMethod(cf, g_m.climatefloat_setEnableOverride, io);
+                            if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+                        }
+                        g_env->DeleteLocalRef(cf);
+                    }
+                    g_env->DeleteLocalRef(mgr);
+                } else {
+                    g_env->ExceptionClear();
+                    w("  ClimateManager.getInstance() FAILED");
+                }
+            } else { w("  JFrame allocation failed"); }
+        } else { w("  NOT RESOLVED"); }
+        w("");
+
+        // ---- Frame context ----
+        w("=== FRAME CONTEXT ===");
+        w("valid=%d screen=%dx%d tileScale=%d playerIdx=%d",
+            g_frame_ctx.valid?1:0, g_frame_ctx.screen_w, g_frame_ctx.screen_h,
+            g_frame_ctx.tile_scale, g_frame_ctx.player_idx);
+        w("camOff=(%.1f, %.1f)", g_frame_ctx.cam_off_x, g_frame_ctx.cam_off_y);
+        w("");
+
+        // ---- All entities ----
+        w("=== ALL ENTITIES (%d) ===", static_cast<int>(entities.size()));
+        for (int i = 0; i < static_cast<int>(entities.size()); ++i) {
+            const auto& e = entities[i];
+            const char* tname = "?";
+            switch(e.type){
+            case entity_type::zombie: tname="zombie"; break;
+            case entity_type::player: tname="player"; break;
+            case entity_type::vehicle: tname="vehicle"; break;
+            case entity_type::animal: tname="animal"; break;
+            case entity_type::item: tname="item"; break;
+            }
+            w("  [%d] type=%s name='%s' wpos=(%.2f,%.2f,%.2f) spos=(%.1f,%.1f) on_screen=%d dist=%.1f hp=%.1f local=%d",
+                i, tname, e.name, e.wx, e.wy, e.wz, e.sx, e.sy, e.on_screen?1:0, e.dist, e.health, e.is_local?1:0);
+        }
+        w("");
+
+        w("=== DUMP COMPLETE ===");
+        w("File: %%TEMP%%\\pzint_dump.txt");
+        std::fclose(f);
+        pzlog2::log("deep debug dump written to %%TEMP%%\\pzint_dump.txt");
+    }
+
     // ---- toggles --------------------------------------------------------------
 
     struct climate_state {
