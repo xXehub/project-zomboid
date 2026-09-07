@@ -110,6 +110,9 @@ namespace pz {
         bool frame_ctx_valid;
         int zombie_count, player_count, vehicle_count, animal_count, item_count;
         bool isoutils_available;
+        bool climate_method_api;   // true = Build 42 setOverride/setEnableOverride available
+        bool climate_fields_ok;    // true = at least desaturation field resolved
+        bool container_sync_ok;    // true = requestSync method available
         char last_spawn_result[128];
     };
     debug_info get_debug_info( );

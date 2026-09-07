@@ -194,6 +194,15 @@ namespace pzj {
         jfieldID climate_override{};
         jfieldID climate_interpolate{};
         jfieldID climate_isOverride{};
+        // ClimateFloat proper method API (Build 42)
+        jmethodID climatefloat_setOverride{};      // (FF)V - value, interpolation
+        jmethodID climatefloat_setEnableOverride{}; // (Z)V
+        jmethodID climatefloat_setFinalValue{};     // (F)V
+
+        // ItemContainer sync for multiplayer
+        jmethodID container_setDirty{};             // (Z)V
+        jmethodID container_setDrawDirty{};         // (Z)V
+        jmethodID container_requestSync{};          // ()V
         jfieldID climate_isOverrideValue{};
         jfieldID climate_finalValue{};
 
@@ -622,6 +631,11 @@ namespace pzj {
         m.climate_isOverride = if_(c.climateFloat, "isOverride", "Z");
         m.climate_isOverrideValue = if_(c.climateFloat,
             "isOverrideValue", "Z");
+
+        // ClimateFloat proper method API (Build 42 uses these, not raw fields)
+        m.climatefloat_setOverride = gm(c.climateFloat, "setOverride", "(FF)V");
+        m.climatefloat_setEnableOverride = gm(c.climateFloat, "setEnableOverride", "(Z)V");
+        m.climatefloat_setFinalValue = gm(c.climateFloat, "setFinalValue", "(F)V");
         m.climate_finalValue = if_(c.climateFloat, "finalValue", "F");
 
         m.stats_set = gm(c.stats, "set",
@@ -652,6 +666,11 @@ namespace pzj {
             "(Ljava/lang/String;F)Lzombie/inventory/InventoryItem;");
         m.factory_CreateItem_str = sm(c.itemFactory, "CreateItem",
             "(Ljava/lang/String;)Lzombie/inventory/InventoryItem;");
+
+        // ItemContainer sync for MP
+        m.container_setDirty = gm(c.itemContainer, "setDirty", "(Z)V");
+        m.container_setDrawDirty = gm(c.itemContainer, "setDrawDirty", "(Z)V");
+        m.container_requestSync = gm(c.itemContainer, "requestSync", "()V");
 
         m.bodydamage_RestoreToFullHealth = gm(c.bodyDamage,
             "RestoreToFullHealth", "()V");
@@ -1404,6 +1423,18 @@ namespace pz {
         if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); return false; }
         const bool ok = (added != nullptr);
 
+        // Sync container state for multiplayer — without this the server
+        // doesn't know about the new item and it becomes a ghost.
+        if (ok) {
+            if (g_m.container_setDirty)
+                g_env->CallVoidMethod(inv, g_m.container_setDirty, JNI_TRUE);
+            if (g_m.container_setDrawDirty)
+                g_env->CallVoidMethod(inv, g_m.container_setDrawDirty, JNI_TRUE);
+            if (g_m.container_requestSync)
+                g_env->CallVoidMethod(inv, g_m.container_requestSync);
+            if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+        }
+
         _snprintf_s(g_last_spawn_msg, sizeof(g_last_spawn_msg), _TRUNCATE,
             "spawn %s -> %s", full_type, ok ? "ok" : "FAIL");
         pzlog2::log("%s", g_last_spawn_msg);
@@ -1496,6 +1527,11 @@ namespace pz {
         d.cam_off_y = g_frame_ctx.cam_off_y;
         d.frame_ctx_valid = g_frame_ctx.valid;
         d.isoutils_available = (g_m.isoutils_XToScreenExact != nullptr);
+        d.climate_method_api = (g_m.climatefloat_setEnableOverride != nullptr &&
+            g_m.climatefloat_setOverride != nullptr);
+        d.climate_fields_ok = (g_m.climate_desaturationMember != nullptr &&
+            g_m.climate_getInstance != nullptr);
+        d.container_sync_ok = (g_m.container_requestSync != nullptr);
         d.zoom = 0.0f;
         if (d.resolved && g_m.core_getZoom && g_cls.core) {
             const auto core = static_cast<jobject>(
@@ -1658,11 +1694,7 @@ namespace pz {
         const std::array<float, 6>& forced_values = { 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f })
     {
         if (!enabled && !climate_state_saved()) return true;
-        if (!g_m.climate_getInstance || !g_m.climate_override ||
-            !g_m.climate_interpolate || !g_m.climate_isOverride ||
-            !g_m.climate_isOverrideValue || !g_m.climate_finalValue) {
-            return false;
-        }
+        if (!g_m.climate_getInstance) return false;
 
         const auto manager = static_cast<jobject>(
             g_env->CallStaticObjectMethod(g_cls.climateManager,
@@ -1680,6 +1712,12 @@ namespace pz {
             g_m.climate_viewDistanceMember,
             g_m.climate_dayLightStrengthMember
         };
+
+        // Use Build 42 method API: setEnableOverride + setOverride(value, interp)
+        // These methods set internal state that raw field writes miss, preventing
+        // the game's climate tick from overwriting our values.
+        const bool has_method_api = g_m.climatefloat_setEnableOverride &&
+            g_m.climatefloat_setOverride;
 
         bool success = true;
         for (std::size_t i = 0; i < members.size(); ++i) {
@@ -1699,10 +1737,9 @@ namespace pz {
 
             if (enabled) {
                 if (!state.saved) {
+                    // Save original state for restoration
                     state.is_override = g_env->GetBooleanField(
                         value, g_m.climate_isOverride);
-                    state.is_override_value = g_env->GetBooleanField(
-                        value, g_m.climate_isOverrideValue);
                     state.override_value = g_env->GetFloatField(
                         value, g_m.climate_override);
                     state.interpolate = g_env->GetFloatField(
@@ -1715,30 +1752,46 @@ namespace pz {
                         g_env->DeleteLocalRef(value);
                         continue;
                     }
+                    state.is_override_value = g_env->GetBooleanField(
+                        value, g_m.climate_isOverrideValue);
+                    if (g_env->ExceptionCheck()) g_env->ExceptionClear();
                     state.saved = true;
                 }
 
-                g_env->SetFloatField(value, g_m.climate_override, forced_values[i]);
-                g_env->SetFloatField(value, g_m.climate_interpolate, 1.0f);
-                g_env->SetBooleanField(value, g_m.climate_isOverrideValue,
-                    JNI_FALSE);
-                g_env->SetBooleanField(value, g_m.climate_isOverride, JNI_TRUE);
-                g_env->SetFloatField(value, g_m.climate_finalValue, forced_values[i]);
-                if (g_env->ExceptionCheck()) {
-                    g_env->ExceptionClear();
-                    success = false;
+                // Apply override using method API (preferred) or raw fields (fallback)
+                if (has_method_api) {
+                    g_env->CallVoidMethod(value, g_m.climatefloat_setOverride,
+                        forced_values[i], 1.0f);
+                    g_env->CallVoidMethod(value, g_m.climatefloat_setEnableOverride,
+                        JNI_TRUE);
+                    if (g_m.climatefloat_setFinalValue)
+                        g_env->CallVoidMethod(value, g_m.climatefloat_setFinalValue,
+                            forced_values[i]);
+                } else {
+                    g_env->SetFloatField(value, g_m.climate_override, forced_values[i]);
+                    g_env->SetFloatField(value, g_m.climate_interpolate, 1.0f);
+                    g_env->SetBooleanField(value, g_m.climate_isOverride, JNI_TRUE);
+                    g_env->SetBooleanField(value, g_m.climate_isOverrideValue, JNI_FALSE);
+                    g_env->SetFloatField(value, g_m.climate_finalValue, forced_values[i]);
                 }
+                if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); success = false; }
             } else if (state.saved) {
-                g_env->SetFloatField(value, g_m.climate_override,
-                    state.override_value);
-                g_env->SetFloatField(value, g_m.climate_interpolate,
-                    state.interpolate);
-                g_env->SetBooleanField(value, g_m.climate_isOverrideValue,
-                    state.is_override_value);
-                g_env->SetBooleanField(value, g_m.climate_isOverride,
-                    state.is_override);
-                g_env->SetFloatField(value, g_m.climate_finalValue,
-                    state.final_value);
+                // Restore original values
+                if (has_method_api) {
+                    g_env->CallVoidMethod(value, g_m.climatefloat_setOverride,
+                        state.override_value, state.interpolate);
+                    g_env->CallVoidMethod(value, g_m.climatefloat_setEnableOverride,
+                        state.is_override);
+                    if (g_m.climatefloat_setFinalValue)
+                        g_env->CallVoidMethod(value, g_m.climatefloat_setFinalValue,
+                            state.final_value);
+                } else {
+                    g_env->SetFloatField(value, g_m.climate_override, state.override_value);
+                    g_env->SetFloatField(value, g_m.climate_interpolate, state.interpolate);
+                    g_env->SetBooleanField(value, g_m.climate_isOverride, state.is_override);
+                    g_env->SetBooleanField(value, g_m.climate_isOverrideValue, state.is_override_value);
+                    g_env->SetFloatField(value, g_m.climate_finalValue, state.final_value);
+                }
                 if (g_env->ExceptionCheck()) {
                     g_env->ExceptionClear();
                     success = false;

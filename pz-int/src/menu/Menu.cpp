@@ -48,13 +48,13 @@ namespace menu_state {
 	bool player_esp_enabled=true; float player_esp_max_dist=50.f;
 	bool player_esp_box=true, player_esp_name=true, player_esp_health=false, player_esp_show_dist=false;
 	float player_esp_color[4]={0.34f,0.78f,0.36f,1.0f};
-	bool vehicle_esp_enabled=false; float vehicle_esp_max_dist=80.f;
+	bool vehicle_esp_enabled=true; float vehicle_esp_max_dist=80.f;
 	bool vehicle_esp_box=true, vehicle_esp_name=true, vehicle_esp_show_dist=true;
 	float vehicle_esp_color[4]={0.40f,0.70f,1.00f,1.0f};
-	bool animal_esp_enabled=false; float animal_esp_max_dist=60.f;
+	bool animal_esp_enabled=true; float animal_esp_max_dist=60.f;
 	bool animal_esp_box=true, animal_esp_name=true, animal_esp_health=true, animal_esp_show_dist=false;
 	float animal_esp_color[4]={1.00f,0.85f,0.30f,1.0f};
-	bool item_esp_enabled=false; float item_esp_max_dist=30.f;
+	bool item_esp_enabled=true; float item_esp_max_dist=30.f;
 	bool item_esp_name=true, item_esp_show_dist=false;
 	float item_esp_color[4]={0.80f,0.80f,0.80f,1.0f};
 	bool esp_render_enabled=true;
@@ -755,6 +755,9 @@ void Menu::Debug() {
 		status("Class Loader", d.class_loader_valid);
 		status("Methods Resolved", d.resolved);
 		status("IsoUtils Projection", d.isoutils_available);
+		status("Climate Method API", d.climate_method_api);
+		status("Climate Fields", d.climate_fields_ok);
+		status("Container Sync (MP)", d.container_sync_ok);
 		ImGui::Spacing();
 
 		ImGui::TextColored(ImVec4(0.47f,0.68f,0.86f,1.f),"=== Frame Context ===");
