@@ -111,15 +111,22 @@ bool projection_contract_holds()
     const auto animal_box = pz::projection::esp_box_for(
         pz::projection::esp_kind::animal, 320.0f, 240.0f, 1.0f);
     const auto text_y = pz::projection::label_above(player_box.top, 12.0f);
+    const auto distance_y = pz::projection::label_below(player_box.bottom);
+    const float full_zombie_health = pz::projection::health_fraction(2.1f, 2.1f);
+    const float half_zombie_health = pz::projection::health_fraction(1.05f, 2.1f);
+    const float invalid_health = pz::projection::health_fraction(10.0f, 0.0f);
     const float halfway = pz::projection::smooth_toward(0.0f, 10.0f, 1.0f / 60.0f);
     const auto aim_right = pz::aim_direction_to(10.0f, 20.0f, 13.0f, 24.0f);
     const auto aim_overlap = pz::aim_direction_to(10.0f, 20.0f, 10.0f, 20.0f);
     return identity.x == 526.5f && identity.y == 594.0f &&
         zoomed.x == 974.375f && zoomed.y == 424.25f &&
         invalid.x == 10.0f && invalid.y == 20.0f &&
-        player_box.left == 311.0f && player_box.right == 329.0f &&
-        player_box.top == 195.5f && player_box.bottom == 240.0f &&
-        player_box.label_y == 187.5f && text_y == 175.5f &&
+        player_box.left == 312.0f && player_box.right == 328.0f &&
+        player_box.top == 200.0f && player_box.bottom == 240.0f &&
+        player_box.label_y == 192.0f && text_y == 180.0f &&
+        distance_y == 248.0f &&
+        full_zombie_health == 1.0f && half_zombie_health == 0.5f &&
+        invalid_health == 0.0f &&
         vehicle_box.left == 204.0f && vehicle_box.right == 436.0f &&
         vehicle_box.top == 96.0f && vehicle_box.bottom == 240.0f &&
         vehicle_box.label_y == 88.0f &&
