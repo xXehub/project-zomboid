@@ -260,14 +260,13 @@ void Menu::Visual() {
 		float lim,bool* box,bool* nm,bool* hp,bool& sd,float* col){
 		_snprintf_s(lb,sizeof(lb),_TRUNCATE,"%s ESP##%se",base,id);
 		ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);ImGui::Checkbox(lb,&en);
+		_snprintf_s(lb,sizeof(lb),_TRUNCATE,"##%scol",id);ColorPicker(lb,col,true);
 		if(!en)return;
 		{float t=md;_snprintf_s(lb,sizeof(lb),_TRUNCATE,"Max distance##%sd",id);InsertSlider(lb,t,5.f,lim,"%.0f");md=t;}
 		if(box){_snprintf_s(lb,sizeof(lb),_TRUNCATE,"Box##%sb",id);ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(34.f);ImGui::Checkbox(lb,box);}
 		if(nm){_snprintf_s(lb,sizeof(lb),_TRUNCATE,"Name##%sn",id);ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(34.f);ImGui::Checkbox(lb,nm);}
 		if(hp){_snprintf_s(lb,sizeof(lb),_TRUNCATE,"Health##%sh",id);ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(34.f);ImGui::Checkbox(lb,hp);}
 		{_snprintf_s(lb,sizeof(lb),_TRUNCATE,"Distance##%ss",id);ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(34.f);ImGui::Checkbox(lb,&sd);}
-		ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(34.f);ImGui::Text("Color");
-		_snprintf_s(lb,sizeof(lb),_TRUNCATE,"##%scol",id);InsertColorPicker(lb,col,true);
 		ImGui::CustomSpacing(6.f);
 	};
 	ImGui::Columns(2,NULL,false);{
@@ -729,25 +728,26 @@ void DrawOverlay(){
 				dl->AddRect(ImVec2(x1-1,y1-1),ImVec2(x2+1,y2+1),shadow,0,0,2.0f);
 				dl->AddRect(ImVec2(x1,y1),ImVec2(x2,y2),col,0,0,1.25f);
 				if(show_hp&&e.health>0){
-					const float fill=std::clamp(e.health/100.0f,0.0f,1.0f);
+					const float max_health=z?2.1f:100.0f;
+					const float fill=pz::projection::health_fraction(e.health,max_health);
 					const float bx=x1-6.0f;
 					dl->AddRectFilled(ImVec2(bx-2.0f,y1),ImVec2(bx+1.0f,y2),IM_COL32(0,0,0,160));
 					const ImU32 bc=IM_COL32((int)((1.f-fill)*255),(int)(fill*255),0,255);
 					dl->AddRectFilled(ImVec2(bx-1.0f,y1+bh*(1-fill)),ImVec2(bx,y2),bc);
 				}
 			}
-			float ty=box.top;
+			float name_y=box.top;
 			if(show_name){
 				ImVec2 ts=ImGui::CalcTextSize(e.name);
-				ty=pz::projection::label_above(ty,ts.y);
+				name_y=pz::projection::label_above(box.top,ts.y);
 				float tx=e.sx-ts.x*0.5f;
-				dl->AddText(ImVec2(tx+1,ty+1),shadow,e.name);
-				dl->AddText(ImVec2(tx,ty),IM_COL32(255,255,255,230),e.name);
+				dl->AddText(ImVec2(tx+1,name_y+1),shadow,e.name);
+				dl->AddText(ImVec2(tx,name_y),IM_COL32(255,255,255,230),e.name);
 			}
 			if(show_dist){
 				char d[32];_snprintf_s(d,sizeof(d),_TRUNCATE,"%.0fm",e.dist);
 				ImVec2 ds=ImGui::CalcTextSize(d);
-				float dx=e.sx-ds.x*0.5f,dy=pz::projection::label_above(ty,ds.y);
+				float dx=e.sx-ds.x*0.5f,dy=pz::projection::label_below(box.bottom);
 				dl->AddText(ImVec2(dx+1,dy+1),shadow,d);
 				dl->AddText(ImVec2(dx,dy),IM_COL32(200,200,200,200),d);
 			}

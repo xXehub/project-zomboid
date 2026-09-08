@@ -313,7 +313,6 @@ static void feed_input(int width, int height)
 	io.MouseDown[0] = (::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
 	io.MouseDown[1] = (::GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
 	io.MouseDown[2] = (::GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
-	io.MouseWheel = 0.0f;
 
 	io.KeyCtrl = (::GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
 	io.KeyShift = (::GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;

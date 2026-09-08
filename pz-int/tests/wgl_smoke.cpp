@@ -306,6 +306,13 @@ int wmain(int argc, wchar_t** argv)
         const auto temp_dir = std::filesystem::temp_directory_path();
         const auto general_capture = temp_dir / L"pzint_general.bmp";
         const auto visual_capture = temp_dir / L"pzint_visual.bmp";
+        const auto scrolled_capture = temp_dir / L"pzint_visual_scrolled.bmp";
+        std::error_code remove_error;
+        std::filesystem::remove(general_capture, remove_error);
+        remove_error.clear();
+        std::filesystem::remove(visual_capture, remove_error);
+        remove_error.clear();
+        std::filesystem::remove(scrolled_capture, remove_error);
         int frame = 0;
         while (std::chrono::steady_clock::now() < deadline) {
             if (frame == 20) {
@@ -324,6 +331,18 @@ int wmain(int argc, wchar_t** argv)
                 input.type = INPUT_MOUSE;
                 input.mi.dwFlags = MOUSEEVENTF_LEFTUP;
                 ::SendInput(1, &input, sizeof(input));
+            } else if (frame == 46) {
+                POINT esp_group{ 300, 300 };
+                ::ClientToScreen(window, &esp_group);
+                ::SetCursorPos(esp_group.x, esp_group.y);
+            } else if (frame == 48 || frame == 50 ||
+                frame == 52 || frame == 54) {
+                const auto wheel_delta = static_cast<WPARAM>(
+                    static_cast<unsigned short>(-WHEEL_DELTA)) << 16;
+                POINT esp_group{ 300, 300 };
+                ::ClientToScreen(window, &esp_group);
+                ::SendMessageW(window, WM_MOUSEWHEEL, wheel_delta,
+                    MAKELPARAM(esp_group.x, esp_group.y));
             }
 
             gl_ext::bind_framebuffer(gl_ext::framebuffer, 0);
@@ -335,11 +354,14 @@ int wmain(int argc, wchar_t** argv)
                 save_front_buffer_bmp(general_capture, width, height);
             if (frame == 40)
                 save_front_buffer_bmp(visual_capture, width, height);
+            if (frame == 70)
+                save_front_buffer_bmp(scrolled_capture, width, height);
             ++frame;
             std::this_thread::sleep_for(std::chrono::milliseconds{16});
         }
         std::cout << " general_capture=" << general_capture.string()
-                  << " visual_capture=" << visual_capture.string();
+                  << " visual_capture=" << visual_capture.string()
+                  << " scrolled_capture=" << scrolled_capture.string();
     }
 
     std::vector<unsigned char> pixels(static_cast<std::size_t>(width) * height * 4);

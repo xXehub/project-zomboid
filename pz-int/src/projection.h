@@ -54,10 +54,10 @@ struct esp_box {
     const esp_kind kind, const float x, const float y, const float zoom) noexcept
 {
     const float scale = visual_zoom(zoom);
-    const float height = kind == esp_kind::humanoid ? 89.0f / scale :
+    const float height = kind == esp_kind::humanoid ? 80.0f / scale :
         kind == esp_kind::vehicle ? 72.0f / scale :
         kind == esp_kind::animal ? 50.0f / scale : 0.0f;
-    const float half_width = kind == esp_kind::humanoid ? 18.0f / scale :
+    const float half_width = kind == esp_kind::humanoid ? 16.0f / scale :
         kind == esp_kind::vehicle ? 58.0f / scale :
         kind == esp_kind::animal ? 24.0f / scale : 0.0f;
     return { x - half_width, y - height, x + half_width, y, y - height - 8.0f };
@@ -67,6 +67,20 @@ struct esp_box {
 [[nodiscard]] constexpr float label_above(const float anchor_y, const float text_height) noexcept
 {
     return anchor_y - 8.0f - text_height;
+}
+
+// Text starts eight screen pixels below the rendered entity box.
+[[nodiscard]] constexpr float label_below(const float anchor_y) noexcept
+{
+    return anchor_y + 8.0f;
+}
+
+[[nodiscard]] constexpr float health_fraction(
+    const float health, const float max_health) noexcept
+{
+    return max_health > 0.0f
+        ? clamp_value(health / max_health, 0.0f, 1.0f)
+        : 0.0f;
 }
 
 } // namespace pz::projection

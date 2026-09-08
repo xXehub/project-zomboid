@@ -186,12 +186,12 @@ namespace pzj {
         jmethodID weapon_getMaxDamage{};
         jmethodID weapon_setMaxDamage{};
         jmethodID char_isUnlimitedCarry{};
-        jmethodID char_setUnlimitedCarry{};
         jmethodID char_getCheats{};
         jmethodID cheats_set{};
         jmethodID cheats_isSet{};
         jfieldID cheat_invisible{};
         jfieldID cheat_noclip{};
+        jfieldID cheat_carry{};
         jfieldID core_debug{};
         jfieldID player_accessLevel{};
         jfieldID stat_fatigue{};
@@ -657,8 +657,6 @@ namespace pzj {
 
         m.char_isUnlimitedCarry = gm(c.isoGameCharacter,
             "isUnlimitedCarry", "()Z");
-        m.char_setUnlimitedCarry = gm(c.isoGameCharacter,
-            "setUnlimitedCarry", "(Z)V");
         m.char_getCheats = gm(c.isoGameCharacter, "getCheats",
             "()Lzombie/characters/PlayerCheats;");
         m.cheats_set = gm(c.playerCheats, "set",
@@ -668,6 +666,8 @@ namespace pzj {
         m.cheat_invisible = sf(c.cheatType, "INVISIBLE",
             "Lzombie/characters/CheatType;");
         m.cheat_noclip = sf(c.cheatType, "NO_CLIP",
+            "Lzombie/characters/CheatType;");
+        m.cheat_carry = sf(c.cheatType, "UNLIMITED_CARRY",
             "Lzombie/characters/CheatType;");
         m.core_debug = sf(c.core, "debug", "Z");
         m.player_accessLevel = if_(c.isoPlayer, "accessLevel",
@@ -2303,6 +2303,9 @@ namespace pz {
         return success && (enabled || !climate_state_saved());
     }
 
+    static bool set_player_cheat(jobject player, jfieldID cheat_field,
+        bool enabled);
+
     static bool restore_player_state()
     {
         if (!g_survival_player) {
@@ -2326,17 +2329,11 @@ namespace pz {
             }
         }
         if (g_carry_saved) {
-            if (!g_m.char_setUnlimitedCarry) {
+            if (!set_player_cheat(g_survival_player, g_m.cheat_carry,
+                    g_carry_state == JNI_TRUE)) {
                 success = false;
             } else {
-                g_env->CallVoidMethod(g_survival_player,
-                    g_m.char_setUnlimitedCarry, g_carry_state);
-                if (g_env->ExceptionCheck()) {
-                    g_env->ExceptionClear();
-                    success = false;
-                } else {
-                    g_carry_saved = false;
-                }
+                g_carry_saved = false;
             }
         }
         if (g_endurance_saved) {
@@ -2593,30 +2590,36 @@ namespace pz {
         return ok;
     }
 
-    // Toggle a local PlayerCheats flag (INVISIBLE, NO_CLIP). These are
-    // client-only and are not serialized in the player packet, matching the
-    // stealth approach EtherMenu uses to avoid admin/anti-cheat behavior.
-    static void set_player_cheat(jobject player, jfieldID cheat_field,
+    // Toggle a local PlayerCheats flag directly. This bypasses the public
+    // capability-gated setters while preserving the original value for
+    // reversible features such as unlimited carry.
+    static bool set_player_cheat(jobject player, jfieldID cheat_field,
         bool enabled)
     {
         if (!player || !g_m.char_getCheats || !g_m.cheats_set || !cheat_field ||
             !g_cls.cheatType) {
-            return;
+            return false;
         }
         const auto cheats = static_cast<jobject>(
             g_env->CallObjectMethod(player, g_m.char_getCheats));
         if (g_env->ExceptionCheck() || !cheats) {
-            g_env->ExceptionClear();
-            return;
+            if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+            return false;
         }
         const auto type = g_env->GetStaticObjectField(g_cls.cheatType, cheat_field);
-        if (type) {
-            g_env->CallVoidMethod(cheats, g_m.cheats_set, type,
-                enabled ? JNI_TRUE : JNI_FALSE);
-            g_env->DeleteLocalRef(type);
+        if (g_env->ExceptionCheck() || !type) {
+            if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+            g_env->DeleteLocalRef(cheats);
+            return false;
         }
-        if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+
+        g_env->CallVoidMethod(cheats, g_m.cheats_set, type,
+            enabled ? JNI_TRUE : JNI_FALSE);
+        const bool success = !g_env->ExceptionCheck();
+        if (!success) g_env->ExceptionClear();
+        g_env->DeleteLocalRef(type);
         g_env->DeleteLocalRef(cheats);
+        return success;
     }
     void apply_survival_features(const survival_features& features,
         const std::vector<entity>& entities)
@@ -2766,7 +2769,7 @@ namespace pz {
         }
 
         if (player && features.unlimited_carry && g_survival_player &&
-            g_m.char_isUnlimitedCarry && g_m.char_setUnlimitedCarry) {
+            g_m.char_isUnlimitedCarry && g_m.cheat_carry) {
             if (!g_carry_saved) {
                 g_carry_state = g_env->CallBooleanMethod(
                     g_survival_player, g_m.char_isUnlimitedCarry);
@@ -2777,19 +2780,13 @@ namespace pz {
                 }
             }
             if (g_carry_saved) {
-                g_env->CallVoidMethod(g_survival_player,
-                    g_m.char_setUnlimitedCarry, JNI_TRUE);
-                if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+                static_cast<void>(set_player_cheat(
+                    g_survival_player, g_m.cheat_carry, true));
             }
         } else if (!features.unlimited_carry && g_survival_player &&
-            g_carry_saved && g_m.char_setUnlimitedCarry) {
-            g_env->CallVoidMethod(g_survival_player,
-                g_m.char_setUnlimitedCarry, g_carry_state);
-            if (g_env->ExceptionCheck()) {
-                g_env->ExceptionClear();
-            } else {
-                g_carry_saved = false;
-            }
+            g_carry_saved && set_player_cheat(g_survival_player,
+                g_m.cheat_carry, g_carry_state == JNI_TRUE)) {
+            g_carry_saved = false;
         }
 
         if (player && features.unlimited_endurance && g_survival_player &&
