@@ -16,6 +16,10 @@
 //---- Define assertion handler. Defaults to calling assert().
 //#define IM_ASSERT(_EXPR)  MyAssert(_EXPR)
 //#define IM_ASSERT(_EXPR)  ((void)(_EXPR))     // Disable asserts
+// pz-int: never abort the host game on an ImGui usage assert. The render loop
+// (safe_render) rebalances the window stack before Render, and ImGui's own
+// EndFrame recovery is the backstop, so asserts must be non-fatal here.
+#define IM_ASSERT(_EXPR)  ((void)(_EXPR))
 
 //---- Define attributes of all API symbols declarations, e.g. for DLL under Windows.
 //#define IMGUI_API __declspec( dllexport )

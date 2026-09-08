@@ -30,6 +30,7 @@
 #include <cstring>
 
 #include "../imgui/imgui.h"
+#include "../imgui/imgui_internal.h"
 #include "../imgui/imgui_impl_opengl3.h"
 #include "../imgui/Icons.h"
 #include "../imgui/IconFont.h"
@@ -153,7 +154,16 @@ namespace seh {
 	} __except (EXCEPTION_EXECUTE_HANDLER) {} }
 	static bool safe_shutdown()     { __try { return pz::shutdown(); } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
 	static void safe_collect()      { __try { pz::collect_entities(g_entities); } __except (EXCEPTION_EXECUTE_HANDLER) {} }
-	static bool safe_render()       { __try { ImGui::Render(); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
+	static bool safe_render()       { __try {
+		// A swallowed SEH exception in DrawOverlay/Menu (e.g. a stale JNI ref)
+		// can leave child windows on the stack. Rebalance before Render so
+		// ImGui's End() sanity check never fires in the shipped build.
+		if (ImGuiContext* ctx = ImGui::GetCurrentContext())
+			while (ctx->CurrentWindowStack.Size > 1)
+				ImGui::End();
+		ImGui::Render();
+		return true;
+	} __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
 	static bool safe_gldraw()       { __try { ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
 }
 

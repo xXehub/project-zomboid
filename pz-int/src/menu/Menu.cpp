@@ -253,47 +253,51 @@ void Menu::General() {
 // ====================== Tab 1: Visual =============================
 void Menu::Visual() {
 	ImGuiStyle* style=&ImGui::GetStyle(); InsertSpacer("Top Spacer");
-	static int selected=0;
-	static const char* targets[]={"Zombie","Player","Vehicle","Animal","Item"};
+	char lb[64];
+	// One ESP groupbox. Each entity type is a main toggle; its sub-options
+	// only appear (indented) while that toggle is enabled.
+	auto esp_section=[&](const char* base,const char* id,bool& en,float& md,
+		float lim,bool* box,bool* nm,bool* hp,bool& sd,float* col){
+		_snprintf_s(lb,sizeof(lb),_TRUNCATE,"%s ESP##%se",base,id);
+		ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);ImGui::Checkbox(lb,&en);
+		if(!en)return;
+		{float t=md;_snprintf_s(lb,sizeof(lb),_TRUNCATE,"Max distance##%sd",id);InsertSlider(lb,t,5.f,lim,"%.0f");md=t;}
+		if(box){_snprintf_s(lb,sizeof(lb),_TRUNCATE,"Box##%sb",id);ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(34.f);ImGui::Checkbox(lb,box);}
+		if(nm){_snprintf_s(lb,sizeof(lb),_TRUNCATE,"Name##%sn",id);ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(34.f);ImGui::Checkbox(lb,nm);}
+		if(hp){_snprintf_s(lb,sizeof(lb),_TRUNCATE,"Health##%sh",id);ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(34.f);ImGui::Checkbox(lb,hp);}
+		{_snprintf_s(lb,sizeof(lb),_TRUNCATE,"Distance##%ss",id);ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(34.f);ImGui::Checkbox(lb,&sd);}
+		ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(34.f);ImGui::Text("Color");
+		_snprintf_s(lb,sizeof(lb),_TRUNCATE,"##%scol",id);InsertColorPicker(lb,col,true);
+		ImGui::CustomSpacing(6.f);
+	};
 	ImGui::Columns(2,NULL,false);{
-		InsertGroupBoxLeft(ENCL("ESP Targets"),350.f);{
-			style->ItemSpacing=ImVec2(4,4);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
-			for(int i=0;i<IM_ARRAYSIZE(targets);++i){
-				ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);
-				if(ImGui::Selectable(targets[i],selected==i,0,ImVec2(220.f,30.f)))selected=i;
-			}
-			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-		}InsertEndGroupBoxLeft(ENCL("ESP Targets Cover"),ENCL("ESP Targets"));
-		InsertSpacer("E-W Spacer");
-		InsertGroupBoxLeft(ENCL("World Visuals"),130.f);{
+		InsertGroupBoxLeft(ENCL("ESP"),498.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
+			esp_section("Zombie","z",menu_state::zombie_esp_enabled,menu_state::zombie_esp_max_dist,200.f,
+				&menu_state::zombie_esp_box,&menu_state::zombie_esp_name,&menu_state::zombie_esp_health,
+				menu_state::zombie_esp_show_dist,menu_state::zombie_esp_color);
+			esp_section("Player","p",menu_state::player_esp_enabled,menu_state::player_esp_max_dist,200.f,
+				&menu_state::player_esp_box,&menu_state::player_esp_name,&menu_state::player_esp_health,
+				menu_state::player_esp_show_dist,menu_state::player_esp_color);
+			esp_section("Vehicle","v",menu_state::vehicle_esp_enabled,menu_state::vehicle_esp_max_dist,300.f,
+				&menu_state::vehicle_esp_box,&menu_state::vehicle_esp_name,nullptr,
+				menu_state::vehicle_esp_show_dist,menu_state::vehicle_esp_color);
+			esp_section("Animal","a",menu_state::animal_esp_enabled,menu_state::animal_esp_max_dist,200.f,
+				&menu_state::animal_esp_box,&menu_state::animal_esp_name,&menu_state::animal_esp_health,
+				menu_state::animal_esp_show_dist,menu_state::animal_esp_color);
+			esp_section("Item","i",menu_state::item_esp_enabled,menu_state::item_esp_max_dist,100.f,
+				nullptr,&menu_state::item_esp_name,nullptr,
+				menu_state::item_esp_show_dist,menu_state::item_esp_color);
+			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
+		}InsertEndGroupBoxLeft(ENCL("ESP Cover"),ENCL("ESP"));
+	}ImGui::NextColumn();{
+		InsertGroupBoxRight(ENCL("World"),498.f);{
+			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
+			InsertCheckbox("ESP render",menu_state::esp_render_enabled);
 			InsertCheckbox("Full bright",menu_state::full_bright);
 			InsertCheckbox("Night vision",menu_state::night_vision);
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-		}InsertEndGroupBoxLeft(ENCL("World Visuals Cover"),ENCL("World Visuals"));
-	}ImGui::NextColumn();{
-		bool*enabled=nullptr;bool*box=nullptr;bool*name=nullptr;bool*health=nullptr;bool*distance=nullptr;
-		float*max_dist=nullptr;float*color=nullptr;float max_limit=200.f;
-		switch(selected){
-		case 0: enabled=&menu_state::zombie_esp_enabled;box=&menu_state::zombie_esp_box;name=&menu_state::zombie_esp_name;health=&menu_state::zombie_esp_health;distance=&menu_state::zombie_esp_show_dist;max_dist=&menu_state::zombie_esp_max_dist;color=menu_state::zombie_esp_color;break;
-		case 1: enabled=&menu_state::player_esp_enabled;box=&menu_state::player_esp_box;name=&menu_state::player_esp_name;health=&menu_state::player_esp_health;distance=&menu_state::player_esp_show_dist;max_dist=&menu_state::player_esp_max_dist;color=menu_state::player_esp_color;break;
-		case 2: enabled=&menu_state::vehicle_esp_enabled;box=&menu_state::vehicle_esp_box;name=&menu_state::vehicle_esp_name;distance=&menu_state::vehicle_esp_show_dist;max_dist=&menu_state::vehicle_esp_max_dist;color=menu_state::vehicle_esp_color;max_limit=300.f;break;
-		case 3: enabled=&menu_state::animal_esp_enabled;box=&menu_state::animal_esp_box;name=&menu_state::animal_esp_name;health=&menu_state::animal_esp_health;distance=&menu_state::animal_esp_show_dist;max_dist=&menu_state::animal_esp_max_dist;color=menu_state::animal_esp_color;break;
-		default: enabled=&menu_state::item_esp_enabled;name=&menu_state::item_esp_name;distance=&menu_state::item_esp_show_dist;max_dist=&menu_state::item_esp_max_dist;color=menu_state::item_esp_color;max_limit=100.f;break;
-		}
-		InsertGroupBoxRight(ENCL("ESP Settings"),498.f);{
-			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
-			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);ImGui::Text("%s ESP",targets[selected]);
-			InsertCheckbox("Enabled##esp_enabled",*enabled);
-			{float t=*max_dist;InsertSlider("Max distance##esp_distance",t,5.f,max_limit,"%.0f");*max_dist=t;}
-			if(box)InsertCheckbox("Box##esp_box",*box);
-			InsertCheckbox("Name##esp_name",*name);
-			if(health)InsertCheckbox("Health##esp_health",*health);
-			InsertCheckbox("Distance##esp_show_distance",*distance);
-			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(CHECKBOX_LABEL_X);ImGui::Text("Color");
-			InsertColorPicker("##espcol",color,true);
-			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-		}InsertEndGroupBoxRight(ENCL("ESP Settings Cover"),ENCL("ESP Settings"));
+		}InsertEndGroupBoxRight(ENCL("World Cover"),ENCL("World"));
 	}ImGui::Columns(1);
 }
 
