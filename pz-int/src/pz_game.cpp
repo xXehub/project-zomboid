@@ -148,6 +148,7 @@ namespace pzj {
         jclass cheatType{};
         jclass enumSet{};
         jclass perkFactory{};
+        jclass worldMapVisited{};
     } g_cls;
 
     struct methods {
@@ -206,6 +207,14 @@ namespace pzj {
         jfieldID cheat_endurance{};
         jfieldID cheat_instant_actions{};
         jfieldID cheat_always_day{};
+        jfieldID cheat_ammo{};
+        jmethodID worldmap_getInstance{};
+        jmethodID worldmap_getMinX{};
+        jmethodID worldmap_getMinY{};
+        jfieldID worldmap_maxX{};
+        jfieldID worldmap_maxY{};
+        jmethodID worldmap_setKnownInCells{};
+        jmethodID worldmap_setVisitedInCells{};
         jfieldID core_debug{};
         jfieldID player_accessLevel{};
         jfieldID stat_fatigue{};
@@ -618,6 +627,7 @@ namespace pzj {
         c.cheatType = fc("zombie/characters/CheatType");
         c.enumSet = fc("java/util/EnumSet");
         c.perkFactory = fc("zombie/characters/skills/PerkFactory");
+        c.worldMapVisited = fc("zombie/worldMap/WorldMapVisited");
         m.player_getInstance = sm(c.isoPlayer, "getInstance",
             "()Lzombie/characters/IsoPlayer;");
         m.player_getPlayerNum = gm(c.isoPlayer, "getPlayerNum", "()I");
@@ -692,6 +702,17 @@ namespace pzj {
         m.cheat_instant_actions = sf(c.cheatType,
             "TIMED_ACTION_INSTANT", cheat_type_sig);
         m.cheat_always_day = sf(c.cheatType, "ALWAYS_DAY", cheat_type_sig);
+        m.cheat_ammo = sf(c.cheatType, "UNLIMITED_AMMO", cheat_type_sig);
+        m.worldmap_getInstance = sm(c.worldMapVisited, "getInstance",
+            "()Lzombie/worldMap/WorldMapVisited;");
+        m.worldmap_getMinX = gm(c.worldMapVisited, "getMinX", "()I");
+        m.worldmap_getMinY = gm(c.worldMapVisited, "getMinY", "()I");
+        m.worldmap_maxX = if_(c.worldMapVisited, "maxX", "I");
+        m.worldmap_maxY = if_(c.worldMapVisited, "maxY", "I");
+        m.worldmap_setKnownInCells = gm(c.worldMapVisited,
+            "setKnownInCells", "(IIII)V");
+        m.worldmap_setVisitedInCells = gm(c.worldMapVisited,
+            "setVisitedInCells", "(IIII)V");
         m.core_debug = sf(c.core, "debug", "Z");
         m.player_accessLevel = if_(c.isoPlayer, "accessLevel",
             "Ljava/lang/String;");
@@ -2196,6 +2217,7 @@ namespace pz {
     static bool g_endurance_applied = false;
     static bool g_instant_actions_applied = false;
     static bool g_carry_applied = false;
+    static bool g_ammo_applied = false;
     // Unlimited carry / anti overload force the maxWeight pair directly.
     static bool g_maxweight_saved = false;
     static jint g_maxweight_value = 0;
@@ -2237,7 +2259,8 @@ namespace pz {
             lhs.all_needs == rhs.all_needs &&
             lhs.invisible == rhs.invisible &&
             lhs.noclip == rhs.noclip &&
-            lhs.unlimited_carry == rhs.unlimited_carry;
+            lhs.unlimited_carry == rhs.unlimited_carry &&
+            lhs.no_reload == rhs.no_reload;
     }
 
     // Cure all diseases, infections, wounds, and negative stats on the player.
@@ -2465,7 +2488,7 @@ namespace pz {
             return !g_invincible_saved && !g_maxweight_saved &&
                 !g_noclip_applied && !g_invisible_applied &&
                 !g_endurance_applied && !g_instant_actions_applied &&
-                !g_carry_applied;
+                !g_carry_applied && !g_ammo_applied;
         }
 
         bool success = true;
@@ -2510,10 +2533,12 @@ namespace pz {
         clear_cheat(g_m.cheat_endurance, g_endurance_applied);
         clear_cheat(g_m.cheat_instant_actions, g_instant_actions_applied);
         clear_cheat(g_m.cheat_carry, g_carry_applied);
+        clear_cheat(g_m.cheat_ammo, g_ammo_applied);
 
         const bool restored = !g_invincible_saved && !g_maxweight_saved &&
             !g_noclip_applied && !g_invisible_applied &&
-            !g_endurance_applied && !g_instant_actions_applied && !g_carry_applied;
+            !g_endurance_applied && !g_instant_actions_applied &&
+            !g_carry_applied && !g_ammo_applied;
         if (restored) {
             g_env->DeleteGlobalRef(g_survival_player);
             g_survival_player = nullptr;
@@ -2794,9 +2819,10 @@ namespace pz {
 
         const bool wants_cheatset = features.noclip || features.invisible ||
             features.unlimited_endurance || features.instant_actions ||
-            features.unlimited_carry;
+            features.unlimited_carry || features.no_reload;
         const bool cheatset_active = g_noclip_applied || g_invisible_applied ||
-            g_endurance_applied || g_instant_actions_applied || g_carry_applied;
+            g_endurance_applied || g_instant_actions_applied || g_carry_applied ||
+            g_ammo_applied;
         const bool wants_weight = features.anti_overload;
         const bool needs_player = features.god_mode || features.anti_hunger ||
             wants_weight || features.anti_thirst || features.auto_heal ||
@@ -2977,13 +3003,15 @@ namespace pz {
                 g_instant_actions_applied);
             drive_cheat(g_m.cheat_carry, features.unlimited_carry,
                 g_carry_applied);
+            drive_cheat(g_m.cheat_ammo, features.no_reload, g_ammo_applied);
         }
 
         // Restore Core.debug only after cheats no longer need it (membership
         // removal above is a direct EnumSet write, so it succeeds regardless).
         const bool still_needs_debug =
             g_noclip_applied || g_invisible_applied ||
-            g_endurance_applied || g_instant_actions_applied || g_carry_applied;
+            g_endurance_applied || g_instant_actions_applied || g_carry_applied ||
+            g_ammo_applied;
         if (!still_needs_debug && g_debug_saved && g_cls.core && g_m.core_debug) {
             g_env->SetStaticBooleanField(g_cls.core, g_m.core_debug, g_debug_state);
             if (g_env->ExceptionCheck()) g_env->ExceptionClear();
@@ -3034,6 +3062,42 @@ namespace pz {
         if (g_env->ExceptionCheck()) g_env->ExceptionClear();
         g_env->DeleteLocalRef(player);
         pzlog2::log("grant_admin -> accessLevel=admin");
+    }
+
+    void reveal_map()
+    {
+        if (!pzj::ensure_resolved()) return;
+        pzj::jframe fr{ 16 };
+        if (!fr.ok || !g_cls.worldMapVisited || !g_m.worldmap_getInstance ||
+            !g_m.worldmap_getMinX || !g_m.worldmap_getMinY ||
+            !g_m.worldmap_maxX || !g_m.worldmap_maxY ||
+            !g_m.worldmap_setKnownInCells || !g_m.worldmap_setVisitedInCells) {
+            return;
+        }
+        const auto visited = static_cast<jobject>(g_env->CallStaticObjectMethod(
+            g_cls.worldMapVisited, g_m.worldmap_getInstance));
+        if (g_env->ExceptionCheck() || !visited) {
+            g_env->ExceptionClear();
+            return;
+        }
+        const jint min_x = g_env->CallIntMethod(visited, g_m.worldmap_getMinX);
+        const jint min_y = g_env->CallIntMethod(visited, g_m.worldmap_getMinY);
+        const jint max_x = g_env->GetIntField(visited, g_m.worldmap_maxX);
+        const jint max_y = g_env->GetIntField(visited, g_m.worldmap_maxY);
+        if (g_env->ExceptionCheck()) {
+            g_env->ExceptionClear();
+            g_env->DeleteLocalRef(visited);
+            return;
+        }
+        g_env->CallVoidMethod(visited, g_m.worldmap_setKnownInCells,
+            min_x, min_y, max_x, max_y);
+        g_env->CallVoidMethod(visited, g_m.worldmap_setVisitedInCells,
+            min_x, min_y, max_x, max_y);
+        if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+        g_env->DeleteLocalRef(visited);
+        pzlog2::log("reveal_map -> cells [%d,%d]..[%d,%d]",
+            static_cast<int>(min_x), static_cast<int>(min_y),
+            static_cast<int>(max_x), static_cast<int>(max_y));
     }
 
     // ---- skill / perk editor ------------------------------------------------
@@ -3199,7 +3263,8 @@ namespace pz {
             if (!restored || climate_state_saved() || g_zombie_state_saved ||
                 g_invincible_saved || g_maxweight_saved || g_noclip_applied ||
                 g_invisible_applied || g_endurance_applied ||
-                g_instant_actions_applied || g_carry_applied || g_debug_saved ||
+                g_instant_actions_applied || g_carry_applied || g_ammo_applied ||
+                g_debug_saved ||
                 g_weapon_state.weapon) {
                 pzlog2::log("feature restoration incomplete; retrying shutdown");
                 return false;
@@ -3207,7 +3272,8 @@ namespace pz {
         } else if (climate_state_saved() || g_zombie_state_saved ||
             g_invincible_saved || g_maxweight_saved || g_noclip_applied ||
             g_invisible_applied || g_endurance_applied ||
-            g_instant_actions_applied || g_carry_applied || g_debug_saved ||
+            g_instant_actions_applied || g_carry_applied || g_ammo_applied ||
+            g_debug_saved ||
             g_weapon_state.weapon) {
             return false;
         }
@@ -3235,6 +3301,7 @@ namespace pz {
         g_endurance_applied = false;
         g_instant_actions_applied = false;
         g_carry_applied = false;
+        g_ammo_applied = false;
         g_maxweight_saved = false;
         g_maxweight_value = 0;
         g_maxweightbase_value = 0;
@@ -3242,7 +3309,7 @@ namespace pz {
         g_frame_ctx = {};
         g_seen_world = false;
 
-        const std::array<jclass*, 33> classes{
+        const std::array<jclass*, 34> classes{
             &g_cls.isoPlayer,
             &g_cls.isoZombie,
             &g_cls.isoGameCharacter,
@@ -3275,6 +3342,7 @@ namespace pz {
             &g_cls.cheatType,
             &g_cls.enumSet,
             &g_cls.perkFactory,
+            &g_cls.worldMapVisited,
             nullptr
         };
         for (auto* const cls : classes) {

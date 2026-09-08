@@ -134,6 +134,7 @@ namespace pz {
 		bool invisible{ false };
 		bool noclip{ false };
 		bool unlimited_carry{ false };
+		bool no_reload{ false };
 	};
 
 	// Applies transition-based world and combat overrides. The entity snapshot
@@ -165,6 +166,9 @@ namespace pz {
     // fullbright toggle, and reports everything.
     void dump_deep_debug( const std::vector< entity >& entities );
     void refill_ammo( );
+
+    // One-shot: reveal the entire world map (WorldMapVisited known + visited).
+    void reveal_map( );
 
     // ---- skill / perk editor -----------------------------------------------
     // PerkFactory.PerkList enumerated once; levels via getPerkLevel /
