@@ -15,6 +15,7 @@
 #include <vector>
 #include <array>
 #include "../src/projection.h"
+#include "../src/feature_policy.h"
 #include "../src/pz_game.h"
 
 #pragma comment(lib, "opengl32.lib")
@@ -105,11 +106,23 @@ bool projection_contract_holds()
     const auto zoomed = pz::projection::from_exact(1948.75f, 848.5f, 2.0f);
     const auto invalid = pz::projection::from_exact(10.0f, 20.0f, 0.0f);
     const auto player_box = pz::projection::esp_box_for(
-        pz::projection::esp_kind::humanoid, 320.0f, 240.0f, 2.0f);
+        pz::projection::esp_kind::humanoid, pz::projection::character_pose::standing,
+        320.0f, 240.0f, 2.0f);
+    const auto crawling_box = pz::projection::esp_box_for(
+        pz::projection::esp_kind::humanoid, pz::projection::character_pose::crawling,
+        320.0f, 240.0f, 1.0f);
+    const auto floor_box = pz::projection::esp_box_for(
+        pz::projection::esp_kind::humanoid, pz::projection::character_pose::floor,
+        320.0f, 240.0f, 1.0f);
+    const auto sitting_box = pz::projection::esp_box_for(
+        pz::projection::esp_kind::humanoid, pz::projection::character_pose::sitting,
+        320.0f, 240.0f, 1.0f);
     const auto vehicle_box = pz::projection::esp_box_for(
-        pz::projection::esp_kind::vehicle, 320.0f, 240.0f, 0.5f);
+        pz::projection::esp_kind::vehicle, pz::projection::character_pose::standing,
+        320.0f, 240.0f, 0.5f);
     const auto animal_box = pz::projection::esp_box_for(
-        pz::projection::esp_kind::animal, 320.0f, 240.0f, 1.0f);
+        pz::projection::esp_kind::animal, pz::projection::character_pose::standing,
+        320.0f, 240.0f, 1.0f);
     const auto text_y = pz::projection::label_above(player_box.top, 12.0f);
     const auto distance_y = pz::projection::label_below(player_box.bottom);
     const float full_zombie_health = pz::projection::health_fraction(2.1f, 2.1f);
@@ -118,13 +131,25 @@ bool projection_contract_holds()
     const float halfway = pz::projection::smooth_toward(0.0f, 10.0f, 1.0f / 60.0f);
     const auto aim_right = pz::aim_direction_to(10.0f, 20.0f, 13.0f, 24.0f);
     const auto aim_overlap = pz::aim_direction_to(10.0f, 20.0f, 10.0f, 20.0f);
+    constexpr auto full_bright = pz::feature_policy::full_bright_values();
+    constexpr int anti_overload_weight = pz::feature_policy::anti_overload_weight();
     return identity.x == 526.5f && identity.y == 594.0f &&
         zoomed.x == 974.375f && zoomed.y == 424.25f &&
         invalid.x == 10.0f && invalid.y == 20.0f &&
-        player_box.left == 312.0f && player_box.right == 328.0f &&
-        player_box.top == 200.0f && player_box.bottom == 240.0f &&
-        player_box.label_y == 192.0f && text_y == 180.0f &&
+        player_box.left == 311.0f && player_box.right == 329.0f &&
+        player_box.top == 187.5f && player_box.bottom == 240.0f &&
+        player_box.label_y == 179.5f && text_y == 167.5f &&
         distance_y == 248.0f &&
+        crawling_box.left == 290.0f && crawling_box.right == 350.0f &&
+        crawling_box.top == 202.0f && crawling_box.bottom == 246.0f &&
+        floor_box.left == 284.0f && floor_box.right == 356.0f &&
+        floor_box.top == 214.0f && floor_box.bottom == 250.0f &&
+        sitting_box.left == 297.0f && sitting_box.right == 343.0f &&
+        sitting_box.top == 178.0f && sitting_box.bottom == 244.0f &&
+        full_bright[0] == 0.0f && full_bright[1] == 1.0f &&
+        full_bright[2] == 0.0f && full_bright[3] == 1.0f &&
+        full_bright[4] == 100.0f && full_bright[5] == 1.0f &&
+        anti_overload_weight == 1000000 &&
         full_zombie_health == 1.0f && half_zombie_health == 0.5f &&
         invalid_health == 0.0f &&
         vehicle_box.left == 204.0f && vehicle_box.right == 436.0f &&
