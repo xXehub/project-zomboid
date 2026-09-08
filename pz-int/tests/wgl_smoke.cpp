@@ -15,6 +15,7 @@
 #include <vector>
 #include <array>
 #include "../src/projection.h"
+#include "../src/pz_game.h"
 
 #pragma comment(lib, "opengl32.lib")
 namespace gl_ext {
@@ -64,6 +65,40 @@ bool contains(const std::string& text, const char* needle)
     return text.find(needle) != std::string::npos;
 }
 
+bool save_front_buffer_bmp(const std::filesystem::path& path,
+    const int width, const int height)
+{
+    std::vector<unsigned char> pixels(
+        static_cast<std::size_t>(width) * height * 4);
+    gl_ext::bind_framebuffer(gl_ext::framebuffer, 0);
+    ::glReadBuffer(GL_FRONT);
+    ::glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+        pixels.data());
+    for (std::size_t i = 0; i < pixels.size(); i += 4)
+        std::swap(pixels[i], pixels[i + 2]);
+
+    BITMAPFILEHEADER file_header{};
+    BITMAPINFOHEADER info_header{};
+    info_header.biSize = sizeof(info_header);
+    info_header.biWidth = width;
+    info_header.biHeight = height;
+    info_header.biPlanes = 1;
+    info_header.biBitCount = 32;
+    info_header.biCompression = BI_RGB;
+    info_header.biSizeImage = static_cast<DWORD>(pixels.size());
+    file_header.bfType = 0x4D42;
+    file_header.bfOffBits = sizeof(file_header) + sizeof(info_header);
+    file_header.bfSize = file_header.bfOffBits + info_header.biSizeImage;
+
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    if (!output) return false;
+    output.write(reinterpret_cast<const char*>(&file_header), sizeof(file_header));
+    output.write(reinterpret_cast<const char*>(&info_header), sizeof(info_header));
+    output.write(reinterpret_cast<const char*>(pixels.data()),
+        static_cast<std::streamsize>(pixels.size()));
+    return output.good();
+}
+
 bool projection_contract_holds()
 {
     const auto identity = pz::projection::from_exact(526.5f, 594.0f, 1.0f);
@@ -73,21 +108,27 @@ bool projection_contract_holds()
         pz::projection::esp_kind::humanoid, 320.0f, 240.0f, 2.0f);
     const auto vehicle_box = pz::projection::esp_box_for(
         pz::projection::esp_kind::vehicle, 320.0f, 240.0f, 0.5f);
+    const auto animal_box = pz::projection::esp_box_for(
+        pz::projection::esp_kind::animal, 320.0f, 240.0f, 1.0f);
     const auto text_y = pz::projection::label_above(player_box.top, 12.0f);
+    const float halfway = pz::projection::smooth_toward(0.0f, 10.0f, 1.0f / 60.0f);
+    const auto aim_right = pz::aim_direction_to(10.0f, 20.0f, 13.0f, 24.0f);
+    const auto aim_overlap = pz::aim_direction_to(10.0f, 20.0f, 10.0f, 20.0f);
     return identity.x == 526.5f && identity.y == 594.0f &&
         zoomed.x == 974.375f && zoomed.y == 424.25f &&
         invalid.x == 10.0f && invalid.y == 20.0f &&
-        player_box.left > 314.13f && player_box.left < 314.14f &&
-        player_box.right > 325.86f && player_box.right < 325.87f &&
-        player_box.top > 207.40f && player_box.top < 207.41f &&
-        player_box.bottom == 240.0f &&
-        player_box.label_y > 199.40f && player_box.label_y < 199.41f &&
-        text_y > 187.40f && text_y < 187.41f &&
-        vehicle_box.left > 288.70f && vehicle_box.left < 288.71f &&
-        vehicle_box.right > 351.29f && vehicle_box.right < 351.30f &&
-        vehicle_box.top > 195.29f && vehicle_box.top < 195.30f &&
-        vehicle_box.bottom == 240.0f &&
-        vehicle_box.label_y > 187.29f && vehicle_box.label_y < 187.30f;
+        player_box.left == 311.0f && player_box.right == 329.0f &&
+        player_box.top == 195.5f && player_box.bottom == 240.0f &&
+        player_box.label_y == 187.5f && text_y == 175.5f &&
+        vehicle_box.left == 204.0f && vehicle_box.right == 436.0f &&
+        vehicle_box.top == 96.0f && vehicle_box.bottom == 240.0f &&
+        vehicle_box.label_y == 88.0f &&
+        animal_box.left == 296.0f && animal_box.right == 344.0f &&
+        animal_box.top == 190.0f && animal_box.bottom == 240.0f &&
+        halfway > 4.99f && halfway < 5.01f &&
+        aim_right.valid && aim_right.x > 0.599f && aim_right.x < 0.601f &&
+        aim_right.y > 0.799f && aim_right.y < 0.801f &&
+        !aim_overlap.valid && aim_overlap.x == 0.0f && aim_overlap.y == 0.0f;
 }
 
 } // namespace
@@ -124,7 +165,7 @@ int wmain(int argc, wchar_t** argv)
     }
 
     HWND window = ::CreateWindowExW(0, class_name, L"pzint WGL smoke",
-        WS_OVERLAPPEDWINDOW, 0, 0, 640, 480, nullptr, nullptr, wc.hInstance, nullptr);
+        WS_OVERLAPPEDWINDOW, 0, 0, 1280, 720, nullptr, nullptr, wc.hInstance, nullptr);
     if (!window) {
         std::cerr << "CreateWindowExW failed\n";
         return 2;
@@ -246,6 +287,52 @@ int wmain(int argc, wchar_t** argv)
         prepare_pz_state();
         ::SwapBuffers(dc);
         std::this_thread::sleep_for(std::chrono::milliseconds{16});
+    }
+
+    // Optional visual-inspection loop. The default path remains unattended;
+    // passing milliseconds renders the menu to the window's back buffer so
+    // desktop capture and real pointer input exercise the visible surface.
+    if (argc > 2) {
+        const int hold_ms = std::max(0, ::_wtoi(argv[2]));
+        const auto deadline = std::chrono::steady_clock::now() +
+            std::chrono::milliseconds{hold_ms};
+        const auto temp_dir = std::filesystem::temp_directory_path();
+        const auto general_capture = temp_dir / L"pzint_general.bmp";
+        const auto visual_capture = temp_dir / L"pzint_visual.bmp";
+        int frame = 0;
+        while (std::chrono::steady_clock::now() < deadline) {
+            if (frame == 20) {
+                POINT visual_tab{ 103, 194 };
+                ::ClientToScreen(window, &visual_tab);
+                ::SetForegroundWindow(window);
+                ::SetActiveWindow(window);
+                ::SetFocus(window);
+                ::SetCursorPos(visual_tab.x, visual_tab.y);
+                INPUT input{};
+                input.type = INPUT_MOUSE;
+                input.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+                ::SendInput(1, &input, sizeof(input));
+            } else if (frame == 24) {
+                INPUT input{};
+                input.type = INPUT_MOUSE;
+                input.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+                ::SendInput(1, &input, sizeof(input));
+            }
+
+            gl_ext::bind_framebuffer(gl_ext::framebuffer, 0);
+            ::glDrawBuffer(GL_BACK);
+            ::glViewport(0, 0, width, height);
+            ::glClear(GL_COLOR_BUFFER_BIT);
+            ::SwapBuffers(dc);
+            if (frame == 10)
+                save_front_buffer_bmp(general_capture, width, height);
+            if (frame == 40)
+                save_front_buffer_bmp(visual_capture, width, height);
+            ++frame;
+            std::this_thread::sleep_for(std::chrono::milliseconds{16});
+        }
+        std::cout << " general_capture=" << general_capture.string()
+                  << " visual_capture=" << visual_capture.string();
     }
 
     std::vector<unsigned char> pixels(static_cast<std::size_t>(width) * height * 4);

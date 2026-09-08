@@ -12,6 +12,7 @@
 // ============================================================================
 
 #include <cstdint>
+#include <cmath>
 #include <vector>
 #include <string>
 
@@ -44,7 +45,30 @@ namespace pz {
         float health{ 0.0f };
         entity_type type{ entity_type::zombie };
         bool is_local{ false };
+        // Smoothed world position used only for rendering. Camera projection
+        // remains exact every frame while 30 Hz JNI snapshots are blended.
+        float render_wx{ 0.0f };
+        float render_wy{ 0.0f };
+        float render_wz{ 0.0f };
+        bool render_position_valid{ false };
     };
+
+    struct aim_direction {
+        float x{ 0.0f };
+        float y{ 0.0f };
+        bool valid{ false };
+    };
+
+    [[nodiscard]] inline aim_direction aim_direction_to(
+        const float origin_x, const float origin_y,
+        const float target_x, const float target_y) noexcept
+    {
+        const float dx = target_x - origin_x;
+        const float dy = target_y - origin_y;
+        const float length = std::sqrt(dx * dx + dy * dy);
+        if (!(length > 0.0001f) || !std::isfinite(length)) return {};
+        return { dx / length, dy / length, true };
+    }
 
     // ---- lifecycle ----------------------------------------------------------
 
@@ -97,12 +121,27 @@ namespace pz {
 		bool anti_thirst{ false };
 		bool auto_heal{ false };
 		bool infinite_ammo{ false };
+		bool unlimited_endurance{ false };
+		bool instant_actions{ false };
+		bool aim_assist{ false };
+		float aim_assist_max_dist{ 20.0f };
+		bool perfect_accuracy{ false };
+		bool always_critical{ false };
+		bool one_hit{ false };
+		bool anti_fatigue{ false };
+		bool all_needs{ false };
+		bool invisible{ false };
+		bool noclip{ false };
+		bool debug_bypass{ false };
 	};
 
-	// Applies transition-based world overrides and a 10 Hz local-player hold.
-	// Reversible fields are restored when their toggle is disabled.
-	void apply_survival_features( const survival_features& features );
+	// Applies transition-based world and combat overrides. The entity snapshot
+	// drives per-frame aim assist; reversible holds run at 10 Hz.
+	void apply_survival_features( const survival_features& features,
+		const std::vector< entity >& entities );
     // Refill ammo of the currently held weapon to max once (menu button).
+    // One-shot: set the local player's access level to "admin".
+    void grant_admin( );
 
     // ---- debug info for the Debug tab --------------------------------------
     struct debug_info {

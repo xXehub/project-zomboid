@@ -143,6 +143,8 @@ namespace pzj {
         jclass isoAnimal{};
         jclass worldInventoryObject{};
         jclass isoUtils{};
+        jclass playerCheats{};
+        jclass cheatType{};
     } g_cls;
 
     struct methods {
@@ -163,6 +165,40 @@ namespace pzj {
         jmethodID char_getPrimaryHandItem{};
         jmethodID handweapon_getMaxAmmo{};
         jfieldID char_invincible{};
+        jmethodID char_isUnlimitedEndurance{};
+        jmethodID char_setUnlimitedEndurance{};
+        jmethodID char_setForwardDirection{};
+        jmethodID player_isAiming{};
+        jmethodID player_isTimedActionInstantCheat{};
+        jmethodID player_setTimedActionInstantCheat{};
+        jmethodID weapon_getHitChance{};
+        jmethodID weapon_setHitChance{};
+        jmethodID weapon_getRecoilDelay{};
+        jmethodID weapon_setRecoilDelay{};
+        jmethodID weapon_getAimingTime{};
+        jmethodID weapon_setAimingTime{};
+        jmethodID weapon_getProjectileSpread{};
+        jmethodID weapon_setProjectileSpread{};
+        jmethodID weapon_getCriticalChance{};
+        jmethodID weapon_setCriticalChance{};
+        jmethodID weapon_getMinDamage{};
+        jmethodID weapon_setMinDamage{};
+        jmethodID weapon_getMaxDamage{};
+        jmethodID weapon_setMaxDamage{};
+        jmethodID char_isUnlimitedCarry{};
+        jmethodID char_setUnlimitedCarry{};
+        jmethodID char_getCheats{};
+        jmethodID cheats_set{};
+        jmethodID cheats_isSet{};
+        jfieldID cheat_invisible{};
+        jfieldID cheat_noclip{};
+        jfieldID core_debug{};
+        jfieldID player_accessLevel{};
+        jfieldID stat_fatigue{};
+        jfieldID stat_boredom{};
+        jfieldID stat_panic{};
+        jfieldID stat_wetness{};
+        jfieldID stat_endurance{};
 
         // IsoZombie / IsoWorld / IsoCell
         jmethodID zombie_getTarget{};
@@ -564,6 +600,8 @@ namespace pzj {
         c.baseVehicle = fc("zombie/vehicles/BaseVehicle");
         c.isoAnimal = fc("zombie/characters/animals/IsoAnimal");
         c.worldInventoryObject = fc("zombie/iso/objects/IsoWorldInventoryObject");
+        c.playerCheats = fc("zombie/characters/PlayerCheats");
+        c.cheatType = fc("zombie/characters/CheatType");
         m.player_getInstance = sm(c.isoPlayer, "getInstance",
             "()Lzombie/characters/IsoPlayer;");
         m.player_getPlayerNum = gm(c.isoPlayer, "getPlayerNum", "()I");
@@ -586,6 +624,64 @@ namespace pzj {
             "()Lzombie/inventory/InventoryItem;");
         m.handweapon_getMaxAmmo = gm(c.handWeapon, "getMaxAmmo", "()I");
         m.char_invincible = if_(c.isoGameCharacter, "invincible", "Z");
+        m.char_isUnlimitedEndurance = gm(c.isoGameCharacter,
+            "isUnlimitedEndurance", "()Z");
+        m.char_setUnlimitedEndurance = gm(c.isoGameCharacter,
+            "setUnlimitedEndurance", "(Z)V");
+        m.char_setForwardDirection = gm(c.isoGameCharacter,
+            "setForwardDirection", "(FF)V");
+        m.player_isAiming = gm(c.isoPlayer, "isAiming", "()Z");
+        m.player_isTimedActionInstantCheat = gm(c.isoPlayer,
+            "isTimedActionInstantCheat", "()Z");
+        m.player_setTimedActionInstantCheat = gm(c.isoPlayer,
+            "setTimedActionInstantCheat", "(Z)V");
+
+        m.weapon_getHitChance = gm(c.handWeapon, "getHitChance", "()I");
+        m.weapon_setHitChance = gm(c.handWeapon, "setHitChance", "(I)V");
+        m.weapon_getRecoilDelay = gm(c.handWeapon, "getRecoilDelay", "()I");
+        m.weapon_setRecoilDelay = gm(c.handWeapon, "setRecoilDelay", "(I)V");
+        m.weapon_getAimingTime = gm(c.handWeapon, "getAimingTime", "()I");
+        m.weapon_setAimingTime = gm(c.handWeapon, "setAimingTime", "(I)V");
+        m.weapon_getProjectileSpread = gm(c.handWeapon,
+            "getProjectileSpread", "()F");
+        m.weapon_setProjectileSpread = gm(c.handWeapon,
+            "setProjectileSpread", "(F)V");
+        m.weapon_getCriticalChance = gm(c.handWeapon,
+            "getCriticalChance", "()F");
+        m.weapon_setCriticalChance = gm(c.handWeapon,
+            "setCriticalChance", "(F)V");
+        m.weapon_getMinDamage = gm(c.handWeapon, "getMinDamage", "()F");
+        m.weapon_setMinDamage = gm(c.handWeapon, "setMinDamage", "(F)V");
+        m.weapon_getMaxDamage = gm(c.handWeapon, "getMaxDamage", "()F");
+        m.weapon_setMaxDamage = gm(c.handWeapon, "setMaxDamage", "(F)V");
+
+        m.char_isUnlimitedCarry = gm(c.isoGameCharacter,
+            "isUnlimitedCarry", "()Z");
+        m.char_setUnlimitedCarry = gm(c.isoGameCharacter,
+            "setUnlimitedCarry", "(Z)V");
+        m.char_getCheats = gm(c.isoGameCharacter, "getCheats",
+            "()Lzombie/characters/PlayerCheats;");
+        m.cheats_set = gm(c.playerCheats, "set",
+            "(Lzombie/characters/CheatType;Z)V");
+        m.cheats_isSet = gm(c.playerCheats, "isSet",
+            "(Lzombie/characters/CheatType;)Z");
+        m.cheat_invisible = sf(c.cheatType, "INVISIBLE",
+            "Lzombie/characters/CheatType;");
+        m.cheat_noclip = sf(c.cheatType, "NO_CLIP",
+            "Lzombie/characters/CheatType;");
+        m.core_debug = sf(c.core, "debug", "Z");
+        m.player_accessLevel = if_(c.isoPlayer, "accessLevel",
+            "Ljava/lang/String;");
+        m.stat_fatigue = sf(c.characterStat, "FATIGUE",
+            "Lzombie/characters/CharacterStat;");
+        m.stat_boredom = sf(c.characterStat, "BOREDOM",
+            "Lzombie/characters/CharacterStat;");
+        m.stat_panic = sf(c.characterStat, "PANIC",
+            "Lzombie/characters/CharacterStat;");
+        m.stat_wetness = sf(c.characterStat, "WETNESS",
+            "Lzombie/characters/CharacterStat;");
+        m.stat_endurance = sf(c.characterStat, "ENDURANCE",
+            "Lzombie/characters/CharacterStat;");
 
         m.zombie_getTarget = gm(c.isoZombie, "getTarget",
             "()Lzombie/iso/IsoMovingObject;");
@@ -1089,6 +1185,40 @@ namespace pz {
         project(e.wx, e.wy, e.wz, e.sx, e.sy, e.on_screen);
     }
 
+    static void carry_render_positions(
+        std::vector<entity>& fresh, const std::vector<entity>& previous)
+    {
+        std::vector<std::uint8_t> matched(previous.size(), 0);
+        for (auto& next : fresh) {
+            std::size_t best = previous.size();
+            float best_distance_sq = 4.0f;
+            for (std::size_t i = 0; i < previous.size(); ++i) {
+                if (matched[i] || previous[i].type != next.type) continue;
+                const float dx = previous[i].wx - next.wx;
+                const float dy = previous[i].wy - next.wy;
+                const float dz = previous[i].wz - next.wz;
+                const float distance_sq = dx * dx + dy * dy + dz * dz;
+                if (distance_sq < best_distance_sq) {
+                    best_distance_sq = distance_sq;
+                    best = i;
+                }
+            }
+
+            if (best != previous.size() && previous[best].render_position_valid) {
+                matched[best] = 1;
+                next.render_wx = previous[best].render_wx;
+                next.render_wy = previous[best].render_wy;
+                next.render_wz = previous[best].render_wz;
+                next.render_position_valid = true;
+            } else {
+                next.render_wx = next.wx;
+                next.render_wy = next.wy;
+                next.render_wz = next.wz;
+                next.render_position_valid = true;
+            }
+        }
+    }
+
     void collect_entities(std::vector<entity>& out)
     {
         if (!pzj::ensure_resolved()) {
@@ -1359,15 +1489,39 @@ namespace pz {
             }
 
             fresh.insert(fresh.end(), ground_items.begin(), ground_items.end());
+            carry_render_positions(fresh, out);
             out.swap(fresh);
             next_refresh = now + refresh_interval;
         }
 
         // Camera follows the player every frame. Reproject the cached world
-        // positions natively so camera movement never waits for the 20 Hz JNI
-        // snapshot cadence.
-        for (auto& entry : out)
-            project(entry.wx, entry.wy, entry.wz, entry.sx, entry.sy, entry.on_screen);
+        // positions natively while 30 Hz JNI snapshots are interpolated.
+        static auto previous_frame = clock::now();
+        const auto frame_now = clock::now();
+        const float delta_seconds = std::clamp(
+            std::chrono::duration<float>(frame_now - previous_frame).count(),
+            0.0f, 0.05f);
+        previous_frame = frame_now;
+
+        // Smooth only entity movement in world space. Camera and zoom remain
+        // exact because projection still runs from the current frame context.
+        for (auto& entry : out) {
+            if (!entry.render_position_valid) {
+                entry.render_wx = entry.wx;
+                entry.render_wy = entry.wy;
+                entry.render_wz = entry.wz;
+                entry.render_position_valid = true;
+            } else {
+                entry.render_wx = projection::smooth_toward(
+                    entry.render_wx, entry.wx, delta_seconds);
+                entry.render_wy = projection::smooth_toward(
+                    entry.render_wy, entry.wy, delta_seconds);
+                entry.render_wz = projection::smooth_toward(
+                    entry.render_wz, entry.wz, delta_seconds);
+            }
+            project(entry.render_wx, entry.render_wy, entry.render_wz,
+                entry.sx, entry.sy, entry.on_screen);
+        }
     }
 
     // ---- item database ------------------------------------------------------
@@ -1879,9 +2033,29 @@ namespace pz {
     static jobject g_survival_player = nullptr;
     static bool g_invincible_saved = false;
     static jboolean g_invincible_state = JNI_FALSE;
-    static bool g_weight_saved = false;
-    static jint g_weight_state = 0;
-    constexpr jint k_forced_carry_capacity{ 500 };
+    static bool g_carry_saved = false;
+    static jboolean g_carry_state = JNI_FALSE;
+    static bool g_debug_saved = false;
+    static jboolean g_debug_state = JNI_FALSE;
+    static bool g_invisible_applied = false;
+    static bool g_noclip_applied = false;
+    static bool g_endurance_saved = false;
+    static jboolean g_endurance_state = JNI_FALSE;
+    static bool g_instant_actions_saved = false;
+    static jboolean g_instant_actions_state = JNI_FALSE;
+
+    struct weapon_state {
+        jobject weapon{};
+        jint hit_chance{};
+        jint recoil_delay{};
+        jint aiming_time{};
+        float projectile_spread{};
+        float critical_chance{};
+        float min_damage{};
+        float max_damage{};
+    };
+
+    static weapon_state g_weapon_state{};
     static survival_features g_last_features{};
 
     static bool same_features(const survival_features& lhs,
@@ -1895,7 +2069,19 @@ namespace pz {
             lhs.unlimited_carry == rhs.unlimited_carry &&
             lhs.anti_thirst == rhs.anti_thirst &&
             lhs.auto_heal == rhs.auto_heal &&
-            lhs.infinite_ammo == rhs.infinite_ammo;
+            lhs.infinite_ammo == rhs.infinite_ammo &&
+            lhs.unlimited_endurance == rhs.unlimited_endurance &&
+            lhs.instant_actions == rhs.instant_actions &&
+            lhs.aim_assist == rhs.aim_assist &&
+            lhs.aim_assist_max_dist == rhs.aim_assist_max_dist &&
+            lhs.perfect_accuracy == rhs.perfect_accuracy &&
+            lhs.always_critical == rhs.always_critical &&
+            lhs.one_hit == rhs.one_hit &&
+            lhs.anti_fatigue == rhs.anti_fatigue &&
+            lhs.all_needs == rhs.all_needs &&
+            lhs.invisible == rhs.invisible &&
+            lhs.noclip == rhs.noclip &&
+            lhs.debug_bypass == rhs.debug_bypass;
     }
 
     // Cure all diseases, infections, wounds, and negative stats on the player.
@@ -2119,8 +2305,10 @@ namespace pz {
 
     static bool restore_player_state()
     {
-        if (!g_survival_player)
-            return !g_invincible_saved && !g_weight_saved;
+        if (!g_survival_player) {
+            return !g_invincible_saved && !g_carry_saved &&
+                !g_endurance_saved && !g_instant_actions_saved;
+        }
 
         bool success = true;
         if (g_invincible_saved) {
@@ -2137,26 +2325,226 @@ namespace pz {
                 }
             }
         }
-        if (g_weight_saved) {
-            if (!g_m.char_setMaxWeight) {
+        if (g_carry_saved) {
+            if (!g_m.char_setUnlimitedCarry) {
                 success = false;
             } else {
                 g_env->CallVoidMethod(g_survival_player,
-                    g_m.char_setMaxWeight, g_weight_state);
+                    g_m.char_setUnlimitedCarry, g_carry_state);
                 if (g_env->ExceptionCheck()) {
                     g_env->ExceptionClear();
                     success = false;
                 } else {
-                    g_weight_saved = false;
+                    g_carry_saved = false;
+                }
+            }
+        }
+        if (g_endurance_saved) {
+            if (!g_m.char_setUnlimitedEndurance) {
+                success = false;
+            } else {
+                g_env->CallVoidMethod(g_survival_player,
+                    g_m.char_setUnlimitedEndurance, g_endurance_state);
+                if (g_env->ExceptionCheck()) {
+                    g_env->ExceptionClear();
+                    success = false;
+                } else {
+                    g_endurance_saved = false;
+                }
+            }
+        }
+        if (g_instant_actions_saved) {
+            if (!g_m.player_setTimedActionInstantCheat) {
+                success = false;
+            } else {
+                g_env->CallVoidMethod(g_survival_player,
+                    g_m.player_setTimedActionInstantCheat,
+                    g_instant_actions_state);
+                if (g_env->ExceptionCheck()) {
+                    g_env->ExceptionClear();
+                    success = false;
+                } else {
+                    g_instant_actions_saved = false;
                 }
             }
         }
 
-        if (!g_invincible_saved && !g_weight_saved) {
+        const bool restored = !g_invincible_saved && !g_carry_saved &&
+            !g_endurance_saved && !g_instant_actions_saved;
+        if (restored) {
             g_env->DeleteGlobalRef(g_survival_player);
             g_survival_player = nullptr;
         }
-        return success && !g_invincible_saved && !g_weight_saved;
+        return success && restored;
+    }
+
+    [[nodiscard]] static bool weapon_features_enabled(
+        const survival_features& features) noexcept
+    {
+        return features.perfect_accuracy || features.always_critical ||
+            features.one_hit;
+    }
+
+    static bool restore_weapon_state()
+    {
+        if (!g_weapon_state.weapon) return true;
+        if (!g_m.weapon_setHitChance || !g_m.weapon_setRecoilDelay ||
+            !g_m.weapon_setAimingTime || !g_m.weapon_setProjectileSpread ||
+            !g_m.weapon_setCriticalChance || !g_m.weapon_setMinDamage ||
+            !g_m.weapon_setMaxDamage) {
+            return false;
+        }
+
+        g_env->CallVoidMethod(g_weapon_state.weapon, g_m.weapon_setHitChance,
+            g_weapon_state.hit_chance);
+        g_env->CallVoidMethod(g_weapon_state.weapon, g_m.weapon_setRecoilDelay,
+            g_weapon_state.recoil_delay);
+        g_env->CallVoidMethod(g_weapon_state.weapon, g_m.weapon_setAimingTime,
+            g_weapon_state.aiming_time);
+        g_env->CallVoidMethod(g_weapon_state.weapon,
+            g_m.weapon_setProjectileSpread, g_weapon_state.projectile_spread);
+        g_env->CallVoidMethod(g_weapon_state.weapon,
+            g_m.weapon_setCriticalChance, g_weapon_state.critical_chance);
+        g_env->CallVoidMethod(g_weapon_state.weapon, g_m.weapon_setMinDamage,
+            g_weapon_state.min_damage);
+        g_env->CallVoidMethod(g_weapon_state.weapon, g_m.weapon_setMaxDamage,
+            g_weapon_state.max_damage);
+        if (g_env->ExceptionCheck()) {
+            g_env->ExceptionClear();
+            return false;
+        }
+
+        g_env->DeleteGlobalRef(g_weapon_state.weapon);
+        g_weapon_state = {};
+        return true;
+    }
+
+    static bool apply_weapon_features(jobject player,
+        const survival_features& features)
+    {
+        const bool enabled = weapon_features_enabled(features);
+        if (!enabled) return restore_weapon_state();
+        if (!player || !g_m.char_getPrimaryHandItem || !g_cls.handWeapon)
+            return false;
+
+        const auto held = static_cast<jobject>(
+            g_env->CallObjectMethod(player, g_m.char_getPrimaryHandItem));
+        if (g_env->ExceptionCheck() || !held ||
+            g_env->IsInstanceOf(held, g_cls.handWeapon) != JNI_TRUE) {
+            g_env->ExceptionClear();
+            if (held) g_env->DeleteLocalRef(held);
+            return restore_weapon_state();
+        }
+
+        if (g_weapon_state.weapon &&
+            !g_env->IsSameObject(held, g_weapon_state.weapon) &&
+            !restore_weapon_state()) {
+            g_env->DeleteLocalRef(held);
+            return false;
+        }
+
+        if (!g_weapon_state.weapon) {
+            if (!g_m.weapon_getHitChance || !g_m.weapon_getRecoilDelay ||
+                !g_m.weapon_getAimingTime || !g_m.weapon_getProjectileSpread ||
+                !g_m.weapon_getCriticalChance || !g_m.weapon_getMinDamage ||
+                !g_m.weapon_getMaxDamage) {
+                g_env->DeleteLocalRef(held);
+                return false;
+            }
+            weapon_state saved{};
+            saved.hit_chance = g_env->CallIntMethod(held,
+                g_m.weapon_getHitChance);
+            saved.recoil_delay = g_env->CallIntMethod(held,
+                g_m.weapon_getRecoilDelay);
+            saved.aiming_time = g_env->CallIntMethod(held,
+                g_m.weapon_getAimingTime);
+            saved.projectile_spread = g_env->CallFloatMethod(held,
+                g_m.weapon_getProjectileSpread);
+            saved.critical_chance = g_env->CallFloatMethod(held,
+                g_m.weapon_getCriticalChance);
+            saved.min_damage = g_env->CallFloatMethod(held,
+                g_m.weapon_getMinDamage);
+            saved.max_damage = g_env->CallFloatMethod(held,
+                g_m.weapon_getMaxDamage);
+            if (g_env->ExceptionCheck()) {
+                g_env->ExceptionClear();
+                g_env->DeleteLocalRef(held);
+                return false;
+            }
+            saved.weapon = g_env->NewGlobalRef(held);
+            if (g_env->ExceptionCheck() || !saved.weapon) {
+                g_env->ExceptionClear();
+                g_env->DeleteLocalRef(held);
+                return false;
+            }
+            g_weapon_state = saved;
+        }
+
+        g_env->CallVoidMethod(held, g_m.weapon_setHitChance,
+            features.perfect_accuracy ? jint{ 100 } : g_weapon_state.hit_chance);
+        g_env->CallVoidMethod(held, g_m.weapon_setRecoilDelay,
+            features.perfect_accuracy ? jint{ 0 } : g_weapon_state.recoil_delay);
+        g_env->CallVoidMethod(held, g_m.weapon_setAimingTime,
+            features.perfect_accuracy ? jint{ 0 } : g_weapon_state.aiming_time);
+        g_env->CallVoidMethod(held, g_m.weapon_setProjectileSpread,
+            features.perfect_accuracy ? 0.0f : g_weapon_state.projectile_spread);
+        g_env->CallVoidMethod(held, g_m.weapon_setCriticalChance,
+            features.always_critical ? 100.0f : g_weapon_state.critical_chance);
+        g_env->CallVoidMethod(held, g_m.weapon_setMinDamage,
+            features.one_hit ? 1000.0f : g_weapon_state.min_damage);
+        g_env->CallVoidMethod(held, g_m.weapon_setMaxDamage,
+            features.one_hit ? 1000.0f : g_weapon_state.max_damage);
+        const bool ok = !g_env->ExceptionCheck();
+        if (!ok) g_env->ExceptionClear();
+        g_env->DeleteLocalRef(held);
+        return ok;
+    }
+
+    static void apply_aim_assist(const survival_features& features,
+        const std::vector<entity>& entities)
+    {
+        if (!features.aim_assist || features.aim_assist_max_dist <= 0.0f ||
+            !g_m.player_isAiming || !g_m.char_setForwardDirection) {
+            return;
+        }
+
+        const auto player = static_cast<jobject>(
+            g_env->CallStaticObjectMethod(g_cls.isoPlayer, g_m.player_getInstance));
+        if (g_env->ExceptionCheck() || !player) {
+            g_env->ExceptionClear();
+            return;
+        }
+        const jboolean aiming = g_env->CallBooleanMethod(player,
+            g_m.player_isAiming);
+        if (g_env->ExceptionCheck() || aiming != JNI_TRUE) {
+            g_env->ExceptionClear();
+            g_env->DeleteLocalRef(player);
+            return;
+        }
+
+        const entity* target = nullptr;
+        for (const auto& candidate : entities) {
+            if (candidate.type != entity_type::zombie ||
+                candidate.health <= 0.0f || !std::isfinite(candidate.dist) ||
+                candidate.dist > features.aim_assist_max_dist) {
+                continue;
+            }
+            if (!target || candidate.dist < target->dist) target = &candidate;
+        }
+        if (target) {
+            const float x = g_env->CallFloatMethod(player, g_m.char_getX);
+            const float y = g_env->CallFloatMethod(player, g_m.char_getY);
+            if (!g_env->ExceptionCheck()) {
+                const auto direction = aim_direction_to(
+                    x, y, target->wx, target->wy);
+                if (direction.valid) {
+                    g_env->CallVoidMethod(player, g_m.char_setForwardDirection,
+                        direction.x, direction.y);
+                }
+            }
+        }
+        if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+        g_env->DeleteLocalRef(player);
     }
 
     static bool set_current_weapon_ammo_to_max()
@@ -2205,7 +2593,33 @@ namespace pz {
         return ok;
     }
 
-    void apply_survival_features(const survival_features& features)
+    // Toggle a local PlayerCheats flag (INVISIBLE, NO_CLIP). These are
+    // client-only and are not serialized in the player packet, matching the
+    // stealth approach EtherMenu uses to avoid admin/anti-cheat behavior.
+    static void set_player_cheat(jobject player, jfieldID cheat_field,
+        bool enabled)
+    {
+        if (!player || !g_m.char_getCheats || !g_m.cheats_set || !cheat_field ||
+            !g_cls.cheatType) {
+            return;
+        }
+        const auto cheats = static_cast<jobject>(
+            g_env->CallObjectMethod(player, g_m.char_getCheats));
+        if (g_env->ExceptionCheck() || !cheats) {
+            g_env->ExceptionClear();
+            return;
+        }
+        const auto type = g_env->GetStaticObjectField(g_cls.cheatType, cheat_field);
+        if (type) {
+            g_env->CallVoidMethod(cheats, g_m.cheats_set, type,
+                enabled ? JNI_TRUE : JNI_FALSE);
+            g_env->DeleteLocalRef(type);
+        }
+        if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+        g_env->DeleteLocalRef(cheats);
+    }
+    void apply_survival_features(const survival_features& features,
+        const std::vector<entity>& entities)
     {
         if (!pzj::ensure_resolved()) return;
 
@@ -2229,6 +2643,8 @@ namespace pz {
                 static_cast<void>(apply_climate_override(false));
             }
         }
+
+        apply_aim_assist(features, entities);
 
         // Throttle everything else to 10Hz (100ms)
         using clock = std::chrono::steady_clock;
@@ -2264,7 +2680,12 @@ namespace pz {
         const bool needs_player = features.god_mode || features.anti_hunger ||
             features.unlimited_carry || features.anti_thirst ||
             features.auto_heal || features.infinite_ammo ||
-            g_invincible_saved || g_weight_saved;
+            features.unlimited_endurance || features.instant_actions ||
+            features.anti_fatigue || features.all_needs ||
+            features.invisible || features.noclip ||
+            weapon_features_enabled(features) || g_weapon_state.weapon ||
+            g_invincible_saved || g_carry_saved || g_endurance_saved ||
+            g_instant_actions_saved || g_invisible_applied || g_noclip_applied;
         jobject player = nullptr;
         if (needs_player) {
             player = g_env->CallStaticObjectMethod(
@@ -2281,7 +2702,8 @@ namespace pz {
             return;
         }
         if (player && !g_survival_player &&
-            (features.god_mode || features.unlimited_carry)) {
+            (features.god_mode || features.unlimited_carry ||
+                features.unlimited_endurance || features.instant_actions)) {
             g_survival_player = g_env->NewGlobalRef(player);
             if (g_env->ExceptionCheck()) {
                 g_env->ExceptionClear();
@@ -2344,51 +2766,123 @@ namespace pz {
         }
 
         if (player && features.unlimited_carry && g_survival_player &&
-            g_m.char_getMaxWeight && g_m.char_setMaxWeight) {
-            if (!g_weight_saved) {
-                g_weight_state = g_env->CallIntMethod(
-                    g_survival_player, g_m.char_getMaxWeight);
+            g_m.char_isUnlimitedCarry && g_m.char_setUnlimitedCarry) {
+            if (!g_carry_saved) {
+                g_carry_state = g_env->CallBooleanMethod(
+                    g_survival_player, g_m.char_isUnlimitedCarry);
                 if (g_env->ExceptionCheck()) {
                     g_env->ExceptionClear();
                 } else {
-                    g_weight_saved = true;
+                    g_carry_saved = true;
                 }
             }
-            if (g_weight_saved) {
-                const jint capacity = std::max(g_weight_state, k_forced_carry_capacity);
+            if (g_carry_saved) {
                 g_env->CallVoidMethod(g_survival_player,
-                    g_m.char_setMaxWeight, capacity);
+                    g_m.char_setUnlimitedCarry, JNI_TRUE);
                 if (g_env->ExceptionCheck()) g_env->ExceptionClear();
             }
         } else if (!features.unlimited_carry && g_survival_player &&
-            g_weight_saved && g_m.char_setMaxWeight) {
+            g_carry_saved && g_m.char_setUnlimitedCarry) {
             g_env->CallVoidMethod(g_survival_player,
-                g_m.char_setMaxWeight, g_weight_state);
+                g_m.char_setUnlimitedCarry, g_carry_state);
             if (g_env->ExceptionCheck()) {
                 g_env->ExceptionClear();
             } else {
-                g_weight_saved = false;
+                g_carry_saved = false;
             }
         }
 
-        if (player && (features.anti_hunger || features.anti_thirst) &&
-            g_m.char_getStats && g_m.stats_set) {
+        if (player && features.unlimited_endurance && g_survival_player &&
+            g_m.char_isUnlimitedEndurance && g_m.char_setUnlimitedEndurance) {
+            if (!g_endurance_saved) {
+                g_endurance_state = g_env->CallBooleanMethod(g_survival_player,
+                    g_m.char_isUnlimitedEndurance);
+                if (g_env->ExceptionCheck()) {
+                    g_env->ExceptionClear();
+                } else {
+                    g_endurance_saved = true;
+                }
+            }
+            if (g_endurance_saved) {
+                g_env->CallVoidMethod(g_survival_player,
+                    g_m.char_setUnlimitedEndurance, JNI_TRUE);
+                if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+            }
+        } else if (!features.unlimited_endurance && g_survival_player &&
+            g_endurance_saved && g_m.char_setUnlimitedEndurance) {
+            g_env->CallVoidMethod(g_survival_player,
+                g_m.char_setUnlimitedEndurance, g_endurance_state);
+            if (g_env->ExceptionCheck()) {
+                g_env->ExceptionClear();
+            } else {
+                g_endurance_saved = false;
+            }
+        }
+
+        if (player && features.instant_actions && g_survival_player &&
+            g_m.player_isTimedActionInstantCheat &&
+            g_m.player_setTimedActionInstantCheat) {
+            if (!g_instant_actions_saved) {
+                g_instant_actions_state = g_env->CallBooleanMethod(
+                    g_survival_player, g_m.player_isTimedActionInstantCheat);
+                if (g_env->ExceptionCheck()) {
+                    g_env->ExceptionClear();
+                } else {
+                    g_instant_actions_saved = true;
+                }
+            }
+            if (g_instant_actions_saved) {
+                g_env->CallVoidMethod(g_survival_player,
+                    g_m.player_setTimedActionInstantCheat, JNI_TRUE);
+                if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+            }
+        } else if (!features.instant_actions && g_survival_player &&
+            g_instant_actions_saved && g_m.player_setTimedActionInstantCheat) {
+            g_env->CallVoidMethod(g_survival_player,
+                g_m.player_setTimedActionInstantCheat,
+                g_instant_actions_state);
+            if (g_env->ExceptionCheck()) {
+                g_env->ExceptionClear();
+            } else {
+                g_instant_actions_saved = false;
+            }
+        }
+
+        const bool needs_active = features.anti_hunger || features.anti_thirst ||
+            features.anti_fatigue || features.all_needs;
+        if (player && needs_active && g_m.char_getStats && g_m.stats_set) {
             const auto stats = static_cast<jobject>(
                 g_env->CallObjectMethod(player, g_m.char_getStats));
             if (!g_env->ExceptionCheck() && stats) {
-                if (features.anti_hunger && g_m.stat_hunger) {
-                    const auto hunger = g_env->GetStaticObjectField(
-                        g_cls.characterStat, g_m.stat_hunger);
-                    if (hunger) g_env->CallBooleanMethod(
-                        stats, g_m.stats_set, hunger, 0.0f);
+                const auto force = [&](jfieldID stat_field, float value) {
+                    if (!stat_field) return;
+                    const auto stat = g_env->GetStaticObjectField(
+                        g_cls.characterStat, stat_field);
+                    if (stat) {
+                        g_env->CallBooleanMethod(stats, g_m.stats_set, stat, value);
+                        g_env->DeleteLocalRef(stat);
+                    }
+                };
+                if (features.anti_hunger || features.all_needs)
+                    force(g_m.stat_hunger, 0.0f);
+                if (features.anti_thirst || features.all_needs)
+                    force(g_m.stat_thirst, 0.0f);
+                if (features.anti_fatigue || features.all_needs) {
+                    force(g_m.stat_fatigue, 0.0f);
+                    force(g_m.stat_endurance, 1.0f);
                 }
-                if (features.anti_thirst && g_m.stat_thirst) {
-                    const auto thirst = g_env->GetStaticObjectField(
-                        g_cls.characterStat, g_m.stat_thirst);
-                    if (thirst) g_env->CallBooleanMethod(
-                        stats, g_m.stats_set, thirst, 0.0f);
+                if (features.all_needs) {
+                    force(g_m.stat_boredom, 0.0f);
+                    force(g_m.stat_unhappiness, 0.0f);
+                    force(g_m.stat_stress, 0.0f);
+                    force(g_m.stat_panic, 0.0f);
+                    force(g_m.stat_sickness, 0.0f);
+                    force(g_m.stat_wetness, 0.0f);
                 }
+                if (g_env->ExceptionCheck()) g_env->ExceptionClear();
                 g_env->DeleteLocalRef(stats);
+            } else {
+                g_env->ExceptionClear();
             }
         }
 
@@ -2399,8 +2893,45 @@ namespace pz {
         if (player && features.auto_heal)
             apply_auto_heal(player);
 
+        static_cast<void>(apply_weapon_features(player, features));
+
+        // Invisible / NoClip: local cheat flags driven to the toggle value.
+        if (player && (features.invisible || g_invisible_applied)) {
+            set_player_cheat(player, g_m.cheat_invisible, features.invisible);
+            g_invisible_applied = features.invisible;
+        }
+        if (player && (features.noclip || g_noclip_applied)) {
+            set_player_cheat(player, g_m.cheat_noclip, features.noclip);
+            g_noclip_applied = features.noclip;
+        }
+
+        // Debug-mode bypass: force the global Core.debug flag while enabled and
+        // restore the captured original when disabled.
+        if (features.debug_bypass && g_cls.core && g_m.core_debug) {
+            if (!g_debug_saved) {
+                g_debug_state = g_env->GetStaticBooleanField(
+                    g_cls.core, g_m.core_debug);
+                if (g_env->ExceptionCheck()) {
+                    g_env->ExceptionClear();
+                } else {
+                    g_debug_saved = true;
+                }
+            }
+            g_env->SetStaticBooleanField(g_cls.core, g_m.core_debug, JNI_TRUE);
+            if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+        } else if (!features.debug_bypass && g_debug_saved && g_m.core_debug) {
+            g_env->SetStaticBooleanField(g_cls.core, g_m.core_debug, g_debug_state);
+            if (g_env->ExceptionCheck()) {
+                g_env->ExceptionClear();
+            } else {
+                g_debug_saved = false;
+            }
+        }
+
         if (!features.god_mode && !features.unlimited_carry &&
-            g_survival_player && !g_invincible_saved && !g_weight_saved) {
+            !features.unlimited_endurance && !features.instant_actions &&
+            g_survival_player && !g_invincible_saved && !g_carry_saved &&
+            !g_endurance_saved && !g_instant_actions_saved) {
             g_env->DeleteGlobalRef(g_survival_player);
             g_survival_player = nullptr;
         }
@@ -2418,6 +2949,30 @@ namespace pz {
 
         if (set_current_weapon_ammo_to_max())
             pzlog2::log("refill_ammo -> max");
+    }
+
+    void grant_admin()
+    {
+        if (!pzj::ensure_resolved()) return;
+
+        pzj::jframe fr{ 16 };
+        if (!fr.ok || !g_m.player_accessLevel) return;
+
+        const auto player = static_cast<jobject>(
+            g_env->CallStaticObjectMethod(g_cls.isoPlayer, g_m.player_getInstance));
+        if (g_env->ExceptionCheck() || !player) {
+            g_env->ExceptionClear();
+            return;
+        }
+
+        const auto admin = g_env->NewStringUTF("admin");
+        if (admin) {
+            g_env->SetObjectField(player, g_m.player_accessLevel, admin);
+            g_env->DeleteLocalRef(admin);
+        }
+        if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+        g_env->DeleteLocalRef(player);
+        pzlog2::log("grant_admin -> accessLevel=admin");
     }
 
     bool shutdown()
@@ -2444,17 +2999,44 @@ namespace pz {
                 }
             }
             if (!restore_player_state()) restored = false;
+            if (!restore_weapon_state()) restored = false;
+            if (g_invisible_applied || g_noclip_applied) {
+                const auto player = static_cast<jobject>(
+                    g_env->CallStaticObjectMethod(g_cls.isoPlayer,
+                        g_m.player_getInstance));
+                if (!g_env->ExceptionCheck() && player) {
+                    set_player_cheat(player, g_m.cheat_invisible, false);
+                    set_player_cheat(player, g_m.cheat_noclip, false);
+                    g_env->DeleteLocalRef(player);
+                } else {
+                    g_env->ExceptionClear();
+                }
+                g_invisible_applied = false;
+                g_noclip_applied = false;
+            }
+            if (g_debug_saved && g_m.core_debug && g_cls.core) {
+                g_env->SetStaticBooleanField(g_cls.core, g_m.core_debug,
+                    g_debug_state);
+                if (g_env->ExceptionCheck()) {
+                    g_env->ExceptionClear();
+                    restored = false;
+                } else {
+                    g_debug_saved = false;
+                }
+            }
             if (g_env->ExceptionCheck()) {
                 g_env->ExceptionClear();
                 restored = false;
             }
             if (!restored || climate_state_saved() || g_zombie_state_saved ||
-                g_invincible_saved || g_weight_saved) {
+                g_invincible_saved || g_carry_saved || g_endurance_saved ||
+                g_instant_actions_saved || g_debug_saved || g_weapon_state.weapon) {
                 pzlog2::log("feature restoration incomplete; retrying shutdown");
                 return false;
             }
         } else if (climate_state_saved() || g_zombie_state_saved ||
-            g_invincible_saved || g_weight_saved) {
+            g_invincible_saved || g_carry_saved || g_endurance_saved ||
+            g_instant_actions_saved || g_debug_saved || g_weapon_state.weapon) {
             return false;
         }
 
@@ -2470,11 +3052,17 @@ namespace pz {
         g_climate_state = {};
         g_zombie_state = JNI_FALSE;
         g_invincible_state = JNI_FALSE;
-        g_weight_state = 0;
+        g_carry_state = JNI_FALSE;
+        g_debug_state = JNI_FALSE;
+        g_invisible_applied = false;
+        g_noclip_applied = false;
+        g_endurance_state = JNI_FALSE;
+        g_instant_actions_state = JNI_FALSE;
+        g_weapon_state = {};
         g_frame_ctx = {};
         g_seen_world = false;
 
-        const std::array<jclass*, 29> classes{
+        const std::array<jclass*, 31> classes{
             &g_cls.isoPlayer,
             &g_cls.isoZombie,
             &g_cls.isoGameCharacter,
@@ -2503,6 +3091,8 @@ namespace pz {
             &g_cls.isoAnimal,
             &g_cls.worldInventoryObject,
             &g_cls.isoUtils,
+            &g_cls.playerCheats,
+            &g_cls.cheatType,
             nullptr
         };
         for (auto* const cls : classes) {

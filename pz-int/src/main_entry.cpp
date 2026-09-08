@@ -135,9 +135,21 @@ namespace seh {
 			.unlimited_carry = menu_state::unlimited_carry,
 			.anti_thirst = menu_state::anti_thirst,
 			.auto_heal = menu_state::auto_heal,
-			.infinite_ammo = menu_state::infinite_ammo
+			.infinite_ammo = menu_state::infinite_ammo,
+			.unlimited_endurance = menu_state::unlimited_endurance,
+			.instant_actions = menu_state::instant_actions,
+			.aim_assist = menu_state::aim_assist,
+			.aim_assist_max_dist = menu_state::aim_assist_max_dist,
+			.perfect_accuracy = menu_state::perfect_accuracy,
+			.always_critical = menu_state::always_critical,
+			.one_hit = menu_state::one_hit,
+			.anti_fatigue = menu_state::anti_fatigue,
+			.all_needs = menu_state::all_needs,
+			.invisible = menu_state::invisible,
+			.noclip = menu_state::noclip,
+			.debug_bypass = menu_state::debug_bypass
 		};
-		pz::apply_survival_features(features);
+		pz::apply_survival_features(features, g_entities);
 	} __except (EXCEPTION_EXECUTE_HANDLER) {} }
 	static bool safe_shutdown()     { __try { return pz::shutdown(); } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
 	static void safe_collect()      { __try { pz::collect_entities(g_entities); } __except (EXCEPTION_EXECUTE_HANDLER) {} }

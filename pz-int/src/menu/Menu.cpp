@@ -16,6 +16,7 @@
 #include <string>
 #include <cstring>
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <vector>
@@ -45,6 +46,10 @@ namespace menu_state {
 	bool full_bright=false, night_vision=false, zombie_ignore=false, god_mode=false;
 	bool anti_hunger=false, unlimited_carry=false, anti_thirst=false;
 	bool auto_heal=false, infinite_ammo=false;
+	bool unlimited_endurance=false, instant_actions=false, aim_assist=false;
+	float aim_assist_max_dist=20.f;
+	bool perfect_accuracy=false, always_critical=false, one_hit=false;
+	bool anti_fatigue=false, all_needs=false, invisible=false, noclip=false, debug_bypass=false;
 	bool zombie_esp_enabled=true; float zombie_esp_max_dist=50.f;
 	bool zombie_esp_box=true, zombie_esp_name=false, zombie_esp_health=false, zombie_esp_show_dist=false;
 	float zombie_esp_color[4]={0.87f,0.27f,0.27f,1.0f};
@@ -147,6 +152,17 @@ void Menu::Shutdown() {
 	menu_state::anti_thirst=false;
 	menu_state::auto_heal=false;
 	menu_state::infinite_ammo=false;
+	menu_state::unlimited_endurance=false;
+	menu_state::instant_actions=false;
+	menu_state::aim_assist=false;
+	menu_state::perfect_accuracy=false;
+	menu_state::always_critical=false;
+	menu_state::one_hit=false;
+	menu_state::anti_fatigue=false;
+	menu_state::all_needs=false;
+	menu_state::invisible=false;
+	menu_state::noclip=false;
+	menu_state::debug_bypass=false;
 	menu_state::zombie_esp_enabled=false;
 	menu_state::zombie_esp_box=false;
 	menu_state::zombie_esp_name=false;
@@ -178,37 +194,27 @@ void Menu::Shutdown() {
 void Menu::General() {
 	ImGuiStyle* style=&ImGui::GetStyle(); InsertSpacer("Top Spacer");
 	ImGui::Columns(2,NULL,false);{
-		InsertGroupBoxLeft(ENCL("Character"),300.f);{
+		InsertGroupBoxLeft(ENCL("Character"),320.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
 			InsertCheckbox("God mode",menu_state::god_mode);
 			InsertCheckbox("Auto heal",menu_state::auto_heal);
 			InsertCheckbox("Anti hunger",menu_state::anti_hunger);
-			InsertCheckbox("Unlimited carry",menu_state::unlimited_carry);
 			InsertCheckbox("Anti thirst",menu_state::anti_thirst);
-			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-		}InsertEndGroupBoxLeft(ENCL("Character Cover"),ENCL("Character"));
-		InsertSpacer("C-W Spacer");
-		InsertGroupBoxLeft(ENCL("Weapon"),150.f);{
-			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
-			InsertCheckbox("Infinite ammo",menu_state::infinite_ammo);
-			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);
-			if(ImGui::Button(ENCL("Refill ammo"),ImVec2(220.f,26.f)))pz::refill_ammo();
-			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-		}InsertEndGroupBoxLeft(ENCL("Weapon Cover"),ENCL("Weapon"));
-	}ImGui::NextColumn();{
-		InsertGroupBoxRight(ENCL("World"),210.f);{
-			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
-			InsertCheckbox("Full bright",menu_state::full_bright);
-			InsertCheckbox("Night vision",menu_state::night_vision);
+			InsertCheckbox("Anti fatigue",menu_state::anti_fatigue);
+			InsertCheckbox("All needs",menu_state::all_needs);
+			InsertCheckbox("Unlimited carry",menu_state::unlimited_carry);
+			InsertCheckbox("Unlimited endurance",menu_state::unlimited_endurance);
+			InsertCheckbox("Instant actions",menu_state::instant_actions);
+			InsertCheckbox("Invisible",menu_state::invisible);
+			InsertCheckbox("No clip",menu_state::noclip);
 			InsertCheckbox("Zombies ignore",menu_state::zombie_ignore);
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-		}InsertEndGroupBoxRight(ENCL("World Cover"),ENCL("World"));
-		InsertSpacer("W-S Spacer");
-		InsertGroupBoxRight(ENCL("Status"),220.f);{
+		}InsertEndGroupBoxLeft(ENCL("Character Cover"),ENCL("Character"));
+		InsertSpacer("C-S Spacer");
+		InsertGroupBoxLeft(ENCL("Status"),150.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
-			ImGui::Text("Game: %s",g_game_ready?"ready":"waiting...");ImGui::Spacing();
 			int zc=0,pc=0,vc=0,ac=0,ic=0;
-			for(auto&e:g_entities){
+			for(const auto&e:g_entities){
 				switch(e.type){
 				case pz::entity_type::zombie:++zc;break;
 				case pz::entity_type::player:++pc;break;
@@ -217,82 +223,78 @@ void Menu::General() {
 				case pz::entity_type::item:++ic;break;
 				}
 			}
-			ImGui::Text("Zombies: %d  Players: %d",zc,pc);
-			ImGui::Text("Vehicles: %d  Animals: %d  Items: %d",vc,ac,ic);
+			ImGui::Text("Game: %s",g_game_ready?"ready":"waiting...");
+			ImGui::Text("Zombies %d  Players %d",zc,pc);
+			ImGui::Text("Vehicles %d  Animals %d",vc,ac);
+			ImGui::Text("Items %d",ic);
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-		}InsertEndGroupBoxRight(ENCL("Status Cover"),ENCL("Status"));
+		}InsertEndGroupBoxLeft(ENCL("Status Cover"),ENCL("Status"));
+	}ImGui::NextColumn();{
+		InsertGroupBoxRight(ENCL("Combat"),488.f);{
+			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
+			InsertCheckbox("Aim assist",menu_state::aim_assist);
+			{float t=menu_state::aim_assist_max_dist;InsertSlider("Aim range##aimd",t,3.f,50.f,"%.0f");menu_state::aim_assist_max_dist=t;}
+			InsertCheckbox("Perfect accuracy",menu_state::perfect_accuracy);
+			InsertCheckbox("Always critical",menu_state::always_critical);
+			InsertCheckbox("One-hit damage",menu_state::one_hit);
+			InsertCheckbox("Infinite ammo",menu_state::infinite_ammo);
+			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);
+			if(ImGui::Button(ENCL("Refill ammo"),ImVec2(220.f,26.f)))pz::refill_ammo();
+			InsertCheckbox("Debug bypass",menu_state::debug_bypass);
+			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);
+			if(ImGui::Button(ENCL("Grant admin access"),ImVec2(220.f,26.f)))pz::grant_admin();
+			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);
+			ImGui::TextDisabled("Nearest zombie while aiming");
+			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
+		}InsertEndGroupBoxRight(ENCL("Combat Cover"),ENCL("Combat"));
 	}ImGui::Columns(1);
 }
 
 // ====================== Tab 1: Visual =============================
 void Menu::Visual() {
 	ImGuiStyle* style=&ImGui::GetStyle(); InsertSpacer("Top Spacer");
+	static int selected=0;
+	static const char* targets[]={"Zombie","Player","Vehicle","Animal","Item"};
 	ImGui::Columns(2,NULL,false);{
-		// ---- Left column: Zombie ESP + Animal ESP ----
-		InsertGroupBoxLeft(ENCL("Zombie ESP"),240.f);{
-			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
-			InsertCheckbox("Enabled",menu_state::zombie_esp_enabled);
-			{float t=menu_state::zombie_esp_max_dist;InsertSlider("Max distance##zd",t,5.f,200.f,"%.0f");menu_state::zombie_esp_max_dist=t;}
-			InsertCheckbox("Box##zb",menu_state::zombie_esp_box);
-			InsertCheckbox("Name##zn",menu_state::zombie_esp_name);
-			InsertCheckbox("Health##zh",menu_state::zombie_esp_health);
-			InsertCheckbox("Distance##zsd",menu_state::zombie_esp_show_dist);
-			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(CHECKBOX_LABEL_X);ImGui::Text("Color");
-			InsertColorPicker("##zcol",menu_state::zombie_esp_color,true);
+		InsertGroupBoxLeft(ENCL("ESP Targets"),350.f);{
+			style->ItemSpacing=ImVec2(4,4);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
+			for(int i=0;i<IM_ARRAYSIZE(targets);++i){
+				ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);
+				if(ImGui::Selectable(targets[i],selected==i,0,ImVec2(220.f,30.f)))selected=i;
+			}
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-		}InsertEndGroupBoxLeft(ENCL("Zombie ESP Cover"),ENCL("Zombie ESP"));
-		InsertSpacer("ZA Spacer");
-		InsertGroupBoxLeft(ENCL("Animal ESP"),240.f);{
+		}InsertEndGroupBoxLeft(ENCL("ESP Targets Cover"),ENCL("ESP Targets"));
+		InsertSpacer("E-W Spacer");
+		InsertGroupBoxLeft(ENCL("World Visuals"),130.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
-			InsertCheckbox("Enabled##ae",menu_state::animal_esp_enabled);
-			{float t=menu_state::animal_esp_max_dist;InsertSlider("Max distance##ad",t,5.f,200.f,"%.0f");menu_state::animal_esp_max_dist=t;}
-			InsertCheckbox("Box##ab",menu_state::animal_esp_box);
-			InsertCheckbox("Name##an",menu_state::animal_esp_name);
-			InsertCheckbox("Health##ah",menu_state::animal_esp_health);
-			InsertCheckbox("Distance##asd",menu_state::animal_esp_show_dist);
-			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(CHECKBOX_LABEL_X);ImGui::Text("Color");
-			InsertColorPicker("##acol",menu_state::animal_esp_color,true);
+			InsertCheckbox("Full bright",menu_state::full_bright);
+			InsertCheckbox("Night vision",menu_state::night_vision);
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-		}InsertEndGroupBoxLeft(ENCL("Animal ESP Cover"),ENCL("Animal ESP"));
+		}InsertEndGroupBoxLeft(ENCL("World Visuals Cover"),ENCL("World Visuals"));
 	}ImGui::NextColumn();{
-		// ---- Right column: Player ESP + Vehicle ESP ----
-		InsertGroupBoxRight(ENCL("Player ESP"),240.f);{
+		bool*enabled=nullptr;bool*box=nullptr;bool*name=nullptr;bool*health=nullptr;bool*distance=nullptr;
+		float*max_dist=nullptr;float*color=nullptr;float max_limit=200.f;
+		switch(selected){
+		case 0: enabled=&menu_state::zombie_esp_enabled;box=&menu_state::zombie_esp_box;name=&menu_state::zombie_esp_name;health=&menu_state::zombie_esp_health;distance=&menu_state::zombie_esp_show_dist;max_dist=&menu_state::zombie_esp_max_dist;color=menu_state::zombie_esp_color;break;
+		case 1: enabled=&menu_state::player_esp_enabled;box=&menu_state::player_esp_box;name=&menu_state::player_esp_name;health=&menu_state::player_esp_health;distance=&menu_state::player_esp_show_dist;max_dist=&menu_state::player_esp_max_dist;color=menu_state::player_esp_color;break;
+		case 2: enabled=&menu_state::vehicle_esp_enabled;box=&menu_state::vehicle_esp_box;name=&menu_state::vehicle_esp_name;distance=&menu_state::vehicle_esp_show_dist;max_dist=&menu_state::vehicle_esp_max_dist;color=menu_state::vehicle_esp_color;max_limit=300.f;break;
+		case 3: enabled=&menu_state::animal_esp_enabled;box=&menu_state::animal_esp_box;name=&menu_state::animal_esp_name;health=&menu_state::animal_esp_health;distance=&menu_state::animal_esp_show_dist;max_dist=&menu_state::animal_esp_max_dist;color=menu_state::animal_esp_color;break;
+		default: enabled=&menu_state::item_esp_enabled;name=&menu_state::item_esp_name;distance=&menu_state::item_esp_show_dist;max_dist=&menu_state::item_esp_max_dist;color=menu_state::item_esp_color;max_limit=100.f;break;
+		}
+		InsertGroupBoxRight(ENCL("ESP Settings"),498.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
-			InsertCheckbox("Enabled##pe",menu_state::player_esp_enabled);
-			{float t=menu_state::player_esp_max_dist;InsertSlider("Max distance##pd",t,5.f,200.f,"%.0f");menu_state::player_esp_max_dist=t;}
-			InsertCheckbox("Box##pb",menu_state::player_esp_box);
-			InsertCheckbox("Name##pn",menu_state::player_esp_name);
-			InsertCheckbox("Health##ph",menu_state::player_esp_health);
-			InsertCheckbox("Distance##psd",menu_state::player_esp_show_dist);
+			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);ImGui::Text("%s ESP",targets[selected]);
+			InsertCheckbox("Enabled##esp_enabled",*enabled);
+			{float t=*max_dist;InsertSlider("Max distance##esp_distance",t,5.f,max_limit,"%.0f");*max_dist=t;}
+			if(box)InsertCheckbox("Box##esp_box",*box);
+			InsertCheckbox("Name##esp_name",*name);
+			if(health)InsertCheckbox("Health##esp_health",*health);
+			InsertCheckbox("Distance##esp_show_distance",*distance);
 			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(CHECKBOX_LABEL_X);ImGui::Text("Color");
-			InsertColorPicker("##pcol",menu_state::player_esp_color,true);
+			InsertColorPicker("##espcol",color,true);
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-		}InsertEndGroupBoxRight(ENCL("Player ESP Cover"),ENCL("Player ESP"));
-		InsertSpacer("PV Spacer");
-		InsertGroupBoxRight(ENCL("Vehicle ESP"),240.f);{
-			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
-			InsertCheckbox("Enabled##ve",menu_state::vehicle_esp_enabled);
-			{float t=menu_state::vehicle_esp_max_dist;InsertSlider("Max distance##vd",t,5.f,300.f,"%.0f");menu_state::vehicle_esp_max_dist=t;}
-			InsertCheckbox("Box##vb",menu_state::vehicle_esp_box);
-			InsertCheckbox("Name##vn",menu_state::vehicle_esp_name);
-			InsertCheckbox("Distance##vsd",menu_state::vehicle_esp_show_dist);
-			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(CHECKBOX_LABEL_X);ImGui::Text("Color");
-			InsertColorPicker("##vcol",menu_state::vehicle_esp_color,true);
-			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-		}InsertEndGroupBoxRight(ENCL("Vehicle ESP Cover"),ENCL("Vehicle ESP"));
+		}InsertEndGroupBoxRight(ENCL("ESP Settings Cover"),ENCL("ESP Settings"));
 	}ImGui::Columns(1);
-	// ---- Item ESP (full width below) ----
-	InsertSpacer("VI Spacer");
-	InsertGroupBoxTop(ENCL("Item ESP"),ImVec2(530.f,160.f));{
-		style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
-		InsertCheckbox("Enabled##ie",menu_state::item_esp_enabled);
-		{float t=menu_state::item_esp_max_dist;InsertSlider("Max distance##id",t,5.f,100.f,"%.0f");menu_state::item_esp_max_dist=t;}
-		InsertCheckbox("Name##in",menu_state::item_esp_name);
-		InsertCheckbox("Distance##isd",menu_state::item_esp_show_dist);
-		ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(CHECKBOX_LABEL_X);ImGui::Text("Color");
-		InsertColorPicker("##icol",menu_state::item_esp_color,true);
-		style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-	}InsertEndGroupBoxTop(ENCL("Item ESP Cover"),ENCL("Item ESP"),ImVec2(530.f,11.f));
 }
 
 // ====================== Tab 2: Spawner (Elden Ring pattern) ========
@@ -446,7 +448,12 @@ namespace config_io {
 		bool ae_en; float ae_dist; bool ae_box, ae_name, ae_hp, ae_sd; float ae_col[4];
 		bool ie_en; float ie_dist; bool ie_name, ie_sd; float ie_col[4];
 		bool esp_render; float menu_col[4]; int menu_key;
+		bool unlimited_endurance, instant_actions, aim_assist;
+		float aim_assist_max_dist;
+		bool perfect_accuracy, always_critical, one_hit;
+		bool anti_fatigue, all_needs, invisible, noclip, debug_bypass;
 	};
+	static constexpr std::size_t legacy_size=offsetof(config_data,unlimited_endurance);
 	static std::string sanitize(const std::string& in) {
 		std::string o; o.reserve(in.size());
 		for(char c:in){if((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c=='-'||c=='_')o.push_back(c);else if(c==' ')o.push_back('_');}
@@ -467,6 +474,11 @@ namespace config_io {
 		d.zombie_ignore=menu_state::zombie_ignore; d.god_mode=menu_state::god_mode;
 		d.anti_hunger=menu_state::anti_hunger; d.unlimited_carry=menu_state::unlimited_carry; d.anti_thirst=menu_state::anti_thirst;
 		d.auto_heal=menu_state::auto_heal; d.infinite_ammo=menu_state::infinite_ammo;
+		d.unlimited_endurance=menu_state::unlimited_endurance; d.instant_actions=menu_state::instant_actions;
+		d.aim_assist=menu_state::aim_assist; d.aim_assist_max_dist=menu_state::aim_assist_max_dist;
+		d.perfect_accuracy=menu_state::perfect_accuracy; d.always_critical=menu_state::always_critical; d.one_hit=menu_state::one_hit;
+		d.anti_fatigue=menu_state::anti_fatigue; d.all_needs=menu_state::all_needs;
+		d.invisible=menu_state::invisible; d.noclip=menu_state::noclip; d.debug_bypass=menu_state::debug_bypass;
 		d.ze_en=menu_state::zombie_esp_enabled; d.ze_dist=menu_state::zombie_esp_max_dist;
 		d.ze_box=menu_state::zombie_esp_box; d.ze_name=menu_state::zombie_esp_name;
 		d.ze_hp=menu_state::zombie_esp_health; d.ze_sd=menu_state::zombie_esp_show_dist;
@@ -494,6 +506,11 @@ namespace config_io {
 		menu_state::zombie_ignore=d.zombie_ignore; menu_state::god_mode=d.god_mode;
 		menu_state::anti_hunger=d.anti_hunger; menu_state::unlimited_carry=d.unlimited_carry; menu_state::anti_thirst=d.anti_thirst;
 		menu_state::auto_heal=d.auto_heal; menu_state::infinite_ammo=d.infinite_ammo;
+		menu_state::unlimited_endurance=d.unlimited_endurance; menu_state::instant_actions=d.instant_actions;
+		menu_state::aim_assist=d.aim_assist; menu_state::aim_assist_max_dist=d.aim_assist_max_dist>0.f?d.aim_assist_max_dist:20.f;
+		menu_state::perfect_accuracy=d.perfect_accuracy; menu_state::always_critical=d.always_critical; menu_state::one_hit=d.one_hit;
+		menu_state::anti_fatigue=d.anti_fatigue; menu_state::all_needs=d.all_needs;
+		menu_state::invisible=d.invisible; menu_state::noclip=d.noclip; menu_state::debug_bypass=d.debug_bypass;
 		menu_state::zombie_esp_enabled=d.ze_en; menu_state::zombie_esp_max_dist=d.ze_dist;
 		menu_state::zombie_esp_box=d.ze_box; menu_state::zombie_esp_name=d.ze_name;
 		menu_state::zombie_esp_health=d.ze_hp; menu_state::zombie_esp_show_dist=d.ze_sd;
@@ -525,7 +542,9 @@ namespace config_io {
 	static void load(const char* name) {
 		auto p=path_for(name?name:"default");
 		FILE*f=nullptr;::_wfopen_s(&f,p.c_str(),L"rb"); if(!f)return;
-		config_data d{}; auto r=fread(&d,1,sizeof(d),f); fclose(f); if(r<sizeof(d))return;
+		config_data d{};d.aim_assist_max_dist=20.f;
+		const auto r=fread(&d,1,sizeof(d),f);fclose(f);
+		if(r<legacy_size)return;
 		unpack(d);
 	}
 	static std::vector<std::string> list() {
@@ -623,6 +642,11 @@ void Menu::Settings() {
 				menu_state::full_bright=menu_state::night_vision=menu_state::zombie_ignore=menu_state::god_mode=false;
 				menu_state::anti_hunger=menu_state::unlimited_carry=menu_state::anti_thirst=false;
 				menu_state::auto_heal=menu_state::infinite_ammo=false;
+				menu_state::unlimited_endurance=menu_state::instant_actions=menu_state::aim_assist=false;
+				menu_state::perfect_accuracy=menu_state::always_critical=menu_state::one_hit=false;
+				menu_state::anti_fatigue=menu_state::all_needs=false;
+				menu_state::invisible=menu_state::noclip=menu_state::debug_bypass=false;
+				menu_state::aim_assist_max_dist=20.f;
 				menu_state::zombie_esp_enabled=menu_state::player_esp_enabled=true;
 				menu_state::zombie_esp_max_dist=menu_state::player_esp_max_dist=50.f;
 				menu_state::esp_render_enabled=true; menu_state::menu_key=VK_INSERT;

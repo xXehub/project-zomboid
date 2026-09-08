@@ -23,7 +23,7 @@ struct screen_point {
 
 [[nodiscard]] constexpr float visual_zoom(const float zoom) noexcept
 {
-    return clamp_value(valid_zoom(zoom), 0.85f, 1.35f);
+    return valid_zoom(zoom);
 }
 
 [[nodiscard]] constexpr screen_point from_exact(
@@ -31,6 +31,13 @@ struct screen_point {
 {
     const float scale = valid_zoom(zoom);
     return { raw_x / scale, raw_y / scale };
+}
+
+[[nodiscard]] constexpr float smooth_toward(
+    const float current, const float target, const float delta_seconds) noexcept
+{
+    const float blend = clamp_value(delta_seconds * 30.0f, 0.0f, 1.0f);
+    return current + (target - current) * blend;
 }
 
 enum class esp_kind { humanoid, vehicle, animal, item };
@@ -47,12 +54,12 @@ struct esp_box {
     const esp_kind kind, const float x, const float y, const float zoom) noexcept
 {
     const float scale = visual_zoom(zoom);
-    const float height = kind == esp_kind::humanoid ? 44.0f / scale :
-        kind == esp_kind::vehicle ? 38.0f / scale :
-        kind == esp_kind::animal ? 30.0f / scale : 0.0f;
-    const float half_width = kind == esp_kind::humanoid ? height * 0.18f :
-        kind == esp_kind::vehicle ? height * 0.70f :
-        kind == esp_kind::animal ? height * 0.36f : 0.0f;
+    const float height = kind == esp_kind::humanoid ? 89.0f / scale :
+        kind == esp_kind::vehicle ? 72.0f / scale :
+        kind == esp_kind::animal ? 50.0f / scale : 0.0f;
+    const float half_width = kind == esp_kind::humanoid ? 18.0f / scale :
+        kind == esp_kind::vehicle ? 58.0f / scale :
+        kind == esp_kind::animal ? 24.0f / scale : 0.0f;
     return { x - half_width, y - height, x + half_width, y, y - height - 8.0f };
 }
 
