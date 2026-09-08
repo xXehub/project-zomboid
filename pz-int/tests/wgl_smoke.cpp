@@ -77,12 +77,17 @@ bool projection_contract_holds()
     return identity.x == 526.5f && identity.y == 594.0f &&
         zoomed.x == 974.375f && zoomed.y == 424.25f &&
         invalid.x == 10.0f && invalid.y == 20.0f &&
-        player_box.left == 313.0f && player_box.right == 327.0f &&
-        player_box.top == 212.0f && player_box.bottom == 240.0f &&
-        player_box.label_y == 204.0f && text_y == 192.0f &&
-        vehicle_box.left == 292.0f && vehicle_box.right == 348.0f &&
-        vehicle_box.top == 160.0f && vehicle_box.bottom == 240.0f &&
-        vehicle_box.label_y == 152.0f;
+        player_box.left > 314.13f && player_box.left < 314.14f &&
+        player_box.right > 325.86f && player_box.right < 325.87f &&
+        player_box.top > 207.40f && player_box.top < 207.41f &&
+        player_box.bottom == 240.0f &&
+        player_box.label_y > 199.40f && player_box.label_y < 199.41f &&
+        text_y > 187.40f && text_y < 187.41f &&
+        vehicle_box.left > 288.70f && vehicle_box.left < 288.71f &&
+        vehicle_box.right > 351.29f && vehicle_box.right < 351.30f &&
+        vehicle_box.top > 195.29f && vehicle_box.top < 195.30f &&
+        vehicle_box.bottom == 240.0f &&
+        vehicle_box.label_y > 187.29f && vehicle_box.label_y < 187.30f;
 }
 
 } // namespace

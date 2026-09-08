@@ -894,33 +894,6 @@ namespace pz {
         sx = sy = 0.0f;
         on_screen = false;
         if (!c.valid) return;
-
-        // IsoUtils returns unscaled offscreen-buffer coordinates. Build 42's
-        // own WorldMarkers renderer divides those exact coordinates by zoom
-        // before using them in the screen/UI coordinate space.
-        if (g_m.isoutils_XToScreenExact && g_m.isoutils_YToScreenExact &&
-            g_cls.isoUtils) {
-            sx = g_env->CallStaticFloatMethod(g_cls.isoUtils,
-                g_m.isoutils_XToScreenExact, wx, wy, wz,
-                static_cast<jint>(c.player_idx));
-            sy = g_env->CallStaticFloatMethod(g_cls.isoUtils,
-                g_m.isoutils_YToScreenExact, wx, wy, wz,
-                static_cast<jint>(c.player_idx));
-            if (g_env->ExceptionCheck()) {
-                g_env->ExceptionClear();
-                sx = sy = 0.0f;
-                return;
-            }
-            const auto point = projection::from_exact(sx, sy, c.zoom);
-            sx = point.x;
-            sy = point.y;
-            on_screen = sx > -64.0f && sy > -64.0f &&
-                sx < static_cast<float>(c.screen_w) + 64.0f &&
-                sy < static_cast<float>(c.screen_h) + 64.0f;
-            return;
-        }
-
-        // Fallback mirrors the same raw-offscreen to screen conversion.
         const float scale = static_cast<float>(c.tile_scale);
         const auto point = projection::from_exact(
             (wx - wy) * 32.0f * scale - c.cam_off_x,
@@ -931,6 +904,16 @@ namespace pz {
         on_screen = sx > -64.0f && sy > -64.0f &&
             sx < static_cast<float>(c.screen_w) + 64.0f &&
             sy < static_cast<float>(c.screen_h) + 64.0f;
+    }
+
+    [[nodiscard]] static float max_projection_distance(const entity_type type) noexcept
+    {
+        switch (type) {
+        case entity_type::vehicle: return 320.0f;
+        case entity_type::item: return 120.0f;
+        default: return 220.0f;
+        }
+
     }
 
     // Fill one entity row from a character object (zombie or player).
@@ -945,6 +928,15 @@ namespace pz {
         if (g_env->ExceptionCheck()) {
             g_env->ExceptionClear();
             e.wx = e.wy = e.wz = 0.0f;
+        }
+
+        const float dx = e.wx - lx;
+        const float dy = e.wy - ly;
+        e.dist = std::sqrt(dx * dx + dy * dy);
+        if (e.dist > max_projection_distance(type)) {
+            e.health = 0.0f;
+            e.on_screen = false;
+            return;
         }
 
         if (type == entity_type::zombie) {
@@ -966,9 +958,6 @@ namespace pz {
             e.health = 0.0f;
         }
 
-        const float dx = e.wx - lx;
-        const float dy = e.wy - ly;
-        e.dist = std::sqrt(dx * dx + dy * dy);
         project(e.wx, e.wy, e.wz, e.sx, e.sy, e.on_screen);
     }
 
@@ -985,6 +974,16 @@ namespace pz {
             g_env->ExceptionClear();
             e.wx = e.wy = e.wz = 0.0f;
         }
+        const float dx = e.wx - lx;
+        const float dy = e.wy - ly;
+        e.dist = std::sqrt(dx * dx + dy * dy);
+        if (e.dist > max_projection_distance(e.type)) {
+            e.health = 0.0f;
+            e.on_screen = false;
+            ::strncpy_s(e.name, sizeof(e.name), "Vehicle", _TRUNCATE);
+            return;
+        }
+
         if (g_m.vehicle_getScriptName) {
             const auto sn = static_cast<jstring>(
                 g_env->CallObjectMethod(veh, g_m.vehicle_getScriptName));
@@ -1001,9 +1000,6 @@ namespace pz {
             ? static_cast<float>(g_env->CallIntMethod(veh, g_m.vehicle_getEngineCondition))
             : 0.0f;
         if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); e.health = 0.0f; }
-        const float dx = e.wx - lx;
-        const float dy = e.wy - ly;
-        e.dist = std::sqrt(dx * dx + dy * dy);
         project(e.wx, e.wy, e.wz, e.sx, e.sy, e.on_screen);
     }
 
@@ -1019,6 +1015,16 @@ namespace pz {
             g_env->ExceptionClear();
             e.wx = e.wy = e.wz = 0.0f;
         }
+        const float dx = e.wx - lx;
+        const float dy = e.wy - ly;
+        e.dist = std::sqrt(dx * dx + dy * dy);
+        if (e.dist > max_projection_distance(e.type)) {
+            e.health = 0.0f;
+            e.on_screen = false;
+            ::strncpy_s(e.name, sizeof(e.name), "Animal", _TRUNCATE);
+            return;
+        }
+
         if (g_m.animal_getAnimalType) {
             const auto at = static_cast<jstring>(
                 g_env->CallObjectMethod(ani, g_m.animal_getAnimalType));
@@ -1035,9 +1041,6 @@ namespace pz {
             ? g_env->CallFloatMethod(ani, g_m.animal_getHealth) * 100.0f
             : 0.0f;
         if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); e.health = 0.0f; }
-        const float dx = e.wx - lx;
-        const float dy = e.wy - ly;
-        e.dist = std::sqrt(dx * dx + dy * dy);
         project(e.wx, e.wy, e.wz, e.sx, e.sy, e.on_screen);
     }
 
@@ -1098,12 +1101,11 @@ namespace pz {
             for (auto& entry : out) entry.on_screen = false;
             return;
         }
-
         using clock = std::chrono::steady_clock;
         static auto next_refresh = clock::time_point{};
         static auto next_item_refresh = clock::time_point{};
         static std::vector<entity> ground_items;
-        constexpr auto refresh_interval = std::chrono::milliseconds{ 50 };
+        constexpr auto refresh_interval = std::chrono::milliseconds{ 33 };
         constexpr auto item_refresh_interval = std::chrono::milliseconds{ 500 };
         constexpr jint max_zombies{ 512 };
         constexpr jint max_vehicles{ 64 };

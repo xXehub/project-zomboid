@@ -696,26 +696,16 @@ void DrawOverlay(){
 				v?pz::projection::esp_kind::vehicle:a?pz::projection::esp_kind::animal:pz::projection::esp_kind::item;
 			const auto box=pz::projection::esp_box_for(kind,e.sx,e.sy,zoom);
 			const float bh=box.bottom-box.top;
-			// Cornered box with outline shadow
 			if(show_box&&bh>0){
-				float x1=box.left,y1=box.top,x2=box.right,y2=box.bottom;
-				float cl=std::min(10.0f/zoom,(x2-x1)*0.3f);
-				auto corner=[&](float ax,float ay,float bx_,float by_,float cx,float cy,float dx,float dy){
-					dl->AddLine(ImVec2(ax,ay),ImVec2(bx_,by_),shadow,3.f);
-					dl->AddLine(ImVec2(cx,cy),ImVec2(dx,dy),shadow,3.f);
-					dl->AddLine(ImVec2(ax,ay),ImVec2(bx_,by_),col,1.5f);
-					dl->AddLine(ImVec2(cx,cy),ImVec2(dx,dy),col,1.5f);
-				};
-				corner(x1,y1,x1+cl,y1, x1,y1,x1,y1+cl);
-				corner(x2,y1,x2-cl,y1, x2,y1,x2,y1+cl);
-				corner(x1,y2,x1+cl,y2, x1,y2,x1,y2-cl);
-				corner(x2,y2,x2-cl,y2, x2,y2,x2,y2-cl);
+				const float x1=box.left,y1=box.top,x2=box.right,y2=box.bottom;
+				dl->AddRect(ImVec2(x1-1,y1-1),ImVec2(x2+1,y2+1),shadow,0,0,2.0f);
+				dl->AddRect(ImVec2(x1,y1),ImVec2(x2,y2),col,0,0,1.25f);
 				if(show_hp&&e.health>0){
-					float fill=std::clamp(e.health/100.0f,0.0f,1.0f);
-					float bx=x1-7;
-					dl->AddRectFilled(ImVec2(bx-3,y1-1),ImVec2(bx+1,y2+1),IM_COL32(0,0,0,160));
-					ImU32 bc=IM_COL32((int)((1.f-fill)*255),(int)(fill*255),0,255);
-					dl->AddRectFilled(ImVec2(bx-2,y1+bh*(1-fill)),ImVec2(bx,y2),bc);
+					const float fill=std::clamp(e.health/100.0f,0.0f,1.0f);
+					const float bx=x1-6.0f;
+					dl->AddRectFilled(ImVec2(bx-2.0f,y1),ImVec2(bx+1.0f,y2),IM_COL32(0,0,0,160));
+					const ImU32 bc=IM_COL32((int)((1.f-fill)*255),(int)(fill*255),0,255);
+					dl->AddRectFilled(ImVec2(bx-1.0f,y1+bh*(1-fill)),ImVec2(bx,y2),bc);
 				}
 			}
 			float ty=box.top;
