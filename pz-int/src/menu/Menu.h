@@ -45,6 +45,7 @@ namespace menu_state {
 	extern bool all_needs;
 	extern bool invisible;
 	extern bool no_reload;
+	extern bool debug_bypass;
 	extern bool noclip;
 
 	extern bool  zombie_esp_enabled;

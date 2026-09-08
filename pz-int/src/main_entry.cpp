@@ -148,7 +148,8 @@ namespace seh {
 			.invisible = menu_state::invisible,
 			.noclip = menu_state::noclip,
 			.unlimited_carry = menu_state::unlimited_carry,
-			.no_reload = menu_state::no_reload
+			.no_reload = menu_state::no_reload,
+			.debug_bypass = menu_state::debug_bypass
 		};
 		pz::apply_survival_features(features, g_entities);
 	} __except (EXCEPTION_EXECUTE_HANDLER) {} }

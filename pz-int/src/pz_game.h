@@ -135,6 +135,7 @@ namespace pz {
 		bool noclip{ false };
 		bool unlimited_carry{ false };
 		bool no_reload{ false };
+		bool debug_bypass{ false };
 	};
 
 	// Applies transition-based world and combat overrides. The entity snapshot

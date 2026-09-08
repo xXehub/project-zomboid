@@ -49,7 +49,7 @@ namespace menu_state {
 	bool unlimited_endurance=false, instant_actions=false, aim_assist=false;
 	float aim_assist_max_dist=20.f;
 	bool perfect_accuracy=false, one_hit=false;
-	bool anti_fatigue=false, all_needs=false, invisible=false, noclip=false, no_reload=false;
+	bool anti_fatigue=false, all_needs=false, invisible=false, noclip=false, no_reload=false, debug_bypass=false;
 	bool zombie_esp_enabled=true; float zombie_esp_max_dist=50.f;
 	bool zombie_esp_box=true, zombie_esp_name=false, zombie_esp_health=false, zombie_esp_show_dist=false;
 	float zombie_esp_color[4]={0.87f,0.27f,0.27f,1.0f};
@@ -151,6 +151,7 @@ void Menu::Shutdown() {
 	menu_state::anti_overload=false;
 	menu_state::unlimited_carry=false;
 	menu_state::no_reload=false;
+	menu_state::debug_bypass=false;
 	menu_state::anti_thirst=false;
 	menu_state::auto_heal=false;
 	menu_state::infinite_ammo=false;
@@ -215,17 +216,24 @@ void Menu::General() {
 		InsertGroupBoxLeft(ENCL("Combat"),214.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
 			InsertCheckbox("Aim assist",menu_state::aim_assist);
-			{float t=menu_state::aim_assist_max_dist;InsertSlider("Aim range##aimd",t,3.f,50.f,"%.0f");menu_state::aim_assist_max_dist=t;}
+			{float t=menu_state::aim_assist_max_dist;InsertSliderWithoutText("Aim range##aimd",t,3.f,50.f,"%.0f");menu_state::aim_assist_max_dist=t;}
 			InsertCheckbox("Perfect accuracy",menu_state::perfect_accuracy);
 			InsertCheckbox("One-hit damage",menu_state::one_hit);
 			InsertCheckbox("Infinite ammo",menu_state::infinite_ammo);
 			InsertCheckbox("No reload",menu_state::no_reload);
-			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);
-			if(ImGui::Button(ENCL("Refill ammo"),ImVec2(108.f,26.f)))pz::refill_ammo();
-			ImGui::SameLine(0.f,4.f);
-			if(ImGui::Button(ENCL("Reveal map"),ImVec2(108.f,26.f)))pz::reveal_map();
-			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);
-			if(ImGui::Button(ENCL("Grant admin access"),ImVec2(220.f,26.f)))pz::grant_admin();
+			InsertCheckbox("Debug bypass",menu_state::debug_bypass);
+			ImGui::PushStyleColor(ImGuiCol_Button,ImColor(37,37,37,255).Value);
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImColor(47,47,47,255).Value);
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImColor(27,27,27,255).Value);
+			ImGui::PushStyleColor(ImGuiCol_Border,ImColor(60,60,60,255).Value);
+			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,1.f);ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,0.f);
+			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(42.f);
+			if(ImGui::Button(ENCL("Refill ammo"),ImVec2(82.f,22.f)))pz::refill_ammo();
+			ImGui::SameLine();
+			if(ImGui::Button(ENCL("Reveal map"),ImVec2(82.f,22.f)))pz::reveal_map();
+			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(42.f);
+			if(ImGui::Button(ENCL("Grant admin access"),ImVec2(174.f,22.f)))pz::grant_admin();
+			ImGui::PopStyleVar(2);ImGui::PopStyleColor(4);
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
 		}InsertEndGroupBoxLeft(ENCL("Combat Cover"),ENCL("Combat"));
 	}ImGui::NextColumn();{
@@ -464,6 +472,7 @@ namespace config_io {
 		bool anti_fatigue, all_needs, invisible, noclip;
 		bool anti_overload;
 		bool no_reload;
+		bool debug_bypass;
 	};
 	static constexpr std::size_t legacy_size=offsetof(config_data,unlimited_endurance);
 	static std::string sanitize(const std::string& in) {
@@ -493,6 +502,7 @@ namespace config_io {
 		d.invisible=menu_state::invisible; d.noclip=menu_state::noclip;
 		d.anti_overload=menu_state::anti_overload;
 		d.no_reload=menu_state::no_reload;
+		d.debug_bypass=menu_state::debug_bypass;
 		d.ze_en=menu_state::zombie_esp_enabled; d.ze_dist=menu_state::zombie_esp_max_dist;
 		d.ze_box=menu_state::zombie_esp_box; d.ze_name=menu_state::zombie_esp_name;
 		d.ze_hp=menu_state::zombie_esp_health; d.ze_sd=menu_state::zombie_esp_show_dist;
@@ -527,6 +537,7 @@ namespace config_io {
 		menu_state::invisible=d.invisible; menu_state::noclip=d.noclip;
 		menu_state::anti_overload=d.anti_overload;
 		menu_state::no_reload=d.no_reload;
+		menu_state::debug_bypass=d.debug_bypass;
 		menu_state::zombie_esp_enabled=d.ze_en; menu_state::zombie_esp_max_dist=d.ze_dist;
 		menu_state::zombie_esp_box=d.ze_box; menu_state::zombie_esp_name=d.ze_name;
 		menu_state::zombie_esp_health=d.ze_hp; menu_state::zombie_esp_show_dist=d.ze_sd;
@@ -662,6 +673,7 @@ void Menu::Settings() {
 				menu_state::unlimited_endurance=menu_state::instant_actions=menu_state::aim_assist=false;
 				menu_state::perfect_accuracy=menu_state::one_hit=false;
 				menu_state::no_reload=false;
+				menu_state::debug_bypass=false;
 				menu_state::anti_fatigue=menu_state::all_needs=false;
 				menu_state::invisible=menu_state::noclip=false;
 				menu_state::aim_assist_max_dist=20.f;

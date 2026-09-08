@@ -2260,7 +2260,8 @@ namespace pz {
             lhs.invisible == rhs.invisible &&
             lhs.noclip == rhs.noclip &&
             lhs.unlimited_carry == rhs.unlimited_carry &&
-            lhs.no_reload == rhs.no_reload;
+            lhs.no_reload == rhs.no_reload &&
+            lhs.debug_bypass == rhs.debug_bypass;
     }
 
     // Cure all diseases, infections, wounds, and negative stats on the player.
@@ -2969,12 +2970,12 @@ namespace pz {
         static_cast<void>(apply_weapon_features(player, features));
 
         // --- PlayerCheats family (NO_CLIP / INVISIBLE / UNLIMITED_ENDURANCE /
-        //     TIMED_ACTION_INSTANT). Both write AND read paths inside the game
-        //     are gated by PlayerCheats.isCheatAllowed() = Core.debug ||
-        //     GameClient.client || GameServer.server. Force Core.debug true
-        //     while any is active so isNoClip()/isInvisible()/... return true,
-        //     then drive the backing EnumSet membership directly. ---
-        if (wants_cheatset && g_cls.core && g_m.core_debug) {
+        //     TIMED_ACTION_INSTANT / UNLIMITED_CARRY / UNLIMITED_AMMO). Their
+        //     read path is gated by isCheatAllowed() = Core.debug || client ||
+        //     server. We ONLY set the backing EnumSet membership here; the
+        //     explicit Debug bypass toggle is what forces Core.debug so they
+        //     take effect. Individual cheats never touch Core.debug. ---
+        if (features.debug_bypass && g_cls.core && g_m.core_debug) {
             if (!g_debug_saved) {
                 g_debug_state = g_env->GetStaticBooleanField(
                     g_cls.core, g_m.core_debug);
@@ -3006,12 +3007,10 @@ namespace pz {
             drive_cheat(g_m.cheat_ammo, features.no_reload, g_ammo_applied);
         }
 
-        // Restore Core.debug only after cheats no longer need it (membership
-        // removal above is a direct EnumSet write, so it succeeds regardless).
-        const bool still_needs_debug =
-            g_noclip_applied || g_invisible_applied ||
-            g_endurance_applied || g_instant_actions_applied || g_carry_applied ||
-            g_ammo_applied;
+        // Core.debug is driven ONLY by the explicit Debug bypass toggle, never
+        // by individual cheats. The cheats above merely set their EnumSet flag;
+        // they take effect once Debug bypass forces Core.debug (isCheatAllowed).
+        const bool still_needs_debug = features.debug_bypass;
         if (!still_needs_debug && g_debug_saved && g_cls.core && g_m.core_debug) {
             g_env->SetStaticBooleanField(g_cls.core, g_m.core_debug, g_debug_state);
             if (g_env->ExceptionCheck()) g_env->ExceptionClear();
@@ -3020,7 +3019,8 @@ namespace pz {
 
         if (g_survival_player && !g_invincible_saved && !g_maxweight_saved &&
             !g_noclip_applied && !g_invisible_applied &&
-            !g_endurance_applied && !g_instant_actions_applied) {
+            !g_endurance_applied && !g_instant_actions_applied &&
+            !g_carry_applied && !g_ammo_applied) {
             g_env->DeleteGlobalRef(g_survival_player);
             g_survival_player = nullptr;
         }
