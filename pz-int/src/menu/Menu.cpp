@@ -11,10 +11,13 @@
 #include "xorstr.hpp"
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "../projection.h"
 #include <algorithm>
 #include <string>
 #include <cstring>
 #include <cctype>
+#include <cstdint>
+#include <cstdio>
 #include <vector>
 #include <fstream>
 #include <atomic>
@@ -40,8 +43,8 @@ float g_menu_accent[4] = {0.47f,0.68f,0.86f,1.0f};
 
 namespace menu_state {
 	bool full_bright=false, night_vision=false, zombie_ignore=false, god_mode=false;
-	bool anti_hunger=false, anti_encumbrance=false, anti_thirst=false;
-	bool auto_heal=false;
+	bool anti_hunger=false, unlimited_carry=false, anti_thirst=false;
+	bool auto_heal=false, infinite_ammo=false;
 	bool zombie_esp_enabled=true; float zombie_esp_max_dist=50.f;
 	bool zombie_esp_box=true, zombie_esp_name=false, zombie_esp_health=false, zombie_esp_show_dist=false;
 	float zombie_esp_color[4]={0.87f,0.27f,0.27f,1.0f};
@@ -140,9 +143,10 @@ void Menu::Shutdown() {
 	menu_state::zombie_ignore=false;
 	menu_state::god_mode=false;
 	menu_state::anti_hunger=false;
-	menu_state::anti_encumbrance=false;
+	menu_state::unlimited_carry=false;
 	menu_state::anti_thirst=false;
 	menu_state::auto_heal=false;
+	menu_state::infinite_ammo=false;
 	menu_state::zombie_esp_enabled=false;
 	menu_state::zombie_esp_box=false;
 	menu_state::zombie_esp_name=false;
@@ -179,13 +183,14 @@ void Menu::General() {
 			InsertCheckbox("God mode",menu_state::god_mode);
 			InsertCheckbox("Auto heal",menu_state::auto_heal);
 			InsertCheckbox("Anti hunger",menu_state::anti_hunger);
-			InsertCheckbox("Anti encumbrance",menu_state::anti_encumbrance);
+			InsertCheckbox("Unlimited carry",menu_state::unlimited_carry);
 			InsertCheckbox("Anti thirst",menu_state::anti_thirst);
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
 		}InsertEndGroupBoxLeft(ENCL("Character Cover"),ENCL("Character"));
 		InsertSpacer("C-W Spacer");
 		InsertGroupBoxLeft(ENCL("Weapon"),150.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
+			InsertCheckbox("Infinite ammo",menu_state::infinite_ammo);
 			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);
 			if(ImGui::Button(ENCL("Refill ammo"),ImVec2(220.f,26.f)))pz::refill_ammo();
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
@@ -404,25 +409,25 @@ void Menu::Spawner() {
 			ImGui::NewLine();ImGui::SameLine(10.f);ImGui::TextDisabled("-1 = default");
 			ImGui::Spacing();
 			const bool ok=spawner::selected>=0&&spawner::selected<(int)spawner::view.size()&&g_game_ready;
-			// Add to Inventory (instant, default stats)
-			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(10.f);
-			if(!ok)ImGui::PushStyleVar(ImGuiStyleVar_Alpha,0.45f);
-			if(ImGui::Button(ENCL("Add to Inventory"),ImVec2(230.f,26.f))&&ok)
-				pz::spawn_item(spawner::view[spawner::selected].full);
-			if(!ok)ImGui::PopStyleVar();
-			// Spawn Custom (condition + ammo)
-			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(10.f);
-			if(!ok)ImGui::PushStyleVar(ImGuiStyleVar_Alpha,0.45f);
-			if(ImGui::Button(ENCL("Spawn Custom"),ImVec2(230.f,26.f))&&ok)
-				pz::spawn_item_custom(spawner::view[spawner::selected].full,spawner::s_cond,spawner::s_ammo);
+            // Spawn on the player's current ground square.
+            ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(10.f);
+            if(!ok)ImGui::PushStyleVar(ImGuiStyleVar_Alpha,0.45f);
+            if(ImGui::Button(ENCL("Spawn on Ground"),ImVec2(230.f,26.f))&&ok)
+                pz::spawn_item(spawner::view[spawner::selected].full);
+            if(!ok)ImGui::PopStyleVar();
+            // Custom ground spawn (condition + ammo)
+            ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(10.f);
+            if(!ok)ImGui::PushStyleVar(ImGuiStyleVar_Alpha,0.45f);
+            if(ImGui::Button(ENCL("Spawn Custom on Ground"),ImVec2(230.f,26.f))&&ok)
+                pz::spawn_item_custom(spawner::view[spawner::selected].full,spawner::s_cond,spawner::s_ammo);
 			if(!ok)ImGui::PopStyleVar();
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
 		}InsertEndGroupBoxRight(ENCL("Spawn Cover"),ENCL("Spawn"));
 		InsertSpacer("S-I Spacer");
 		InsertGroupBoxRight(ENCL("Info"),168.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
-			ImGui::TextDisabled("Add = instant, default stats");
-			ImGui::TextDisabled("Custom = set condition + ammo");
+            ImGui::TextDisabled("Spawn = ground, default stats");
+            ImGui::TextDisabled("Custom = ground + condition/ammo");
 			ImGui::Spacing();ImGui::Text("Game: %s",g_game_ready?"ready":"waiting...");
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
 		}InsertEndGroupBoxRight(ENCL("Info Cover"),ENCL("Info"));
@@ -433,8 +438,8 @@ void Menu::Spawner() {
 namespace config_io {
 	struct config_data {
 		bool full_bright, night_vision, zombie_ignore, god_mode;
-		bool anti_hunger, anti_encumbrance, anti_thirst;
-		bool auto_heal;
+		bool anti_hunger, unlimited_carry, anti_thirst;
+		bool auto_heal, infinite_ammo;
 		bool ze_en; float ze_dist; bool ze_box, ze_name, ze_hp, ze_sd; float ze_col[4];
 		bool pe_en; float pe_dist; bool pe_box, pe_name, pe_hp, pe_sd; float pe_col[4];
 		bool ve_en; float ve_dist; bool ve_box, ve_name, ve_sd; float ve_col[4];
@@ -460,8 +465,8 @@ namespace config_io {
 	static void pack(config_data& d) {
 		d.full_bright=menu_state::full_bright; d.night_vision=menu_state::night_vision;
 		d.zombie_ignore=menu_state::zombie_ignore; d.god_mode=menu_state::god_mode;
-		d.anti_hunger=menu_state::anti_hunger; d.anti_encumbrance=menu_state::anti_encumbrance; d.anti_thirst=menu_state::anti_thirst;
-		d.auto_heal=menu_state::auto_heal;
+		d.anti_hunger=menu_state::anti_hunger; d.unlimited_carry=menu_state::unlimited_carry; d.anti_thirst=menu_state::anti_thirst;
+		d.auto_heal=menu_state::auto_heal; d.infinite_ammo=menu_state::infinite_ammo;
 		d.ze_en=menu_state::zombie_esp_enabled; d.ze_dist=menu_state::zombie_esp_max_dist;
 		d.ze_box=menu_state::zombie_esp_box; d.ze_name=menu_state::zombie_esp_name;
 		d.ze_hp=menu_state::zombie_esp_health; d.ze_sd=menu_state::zombie_esp_show_dist;
@@ -487,8 +492,8 @@ namespace config_io {
 	static void unpack(const config_data& d) {
 		menu_state::full_bright=d.full_bright; menu_state::night_vision=d.night_vision;
 		menu_state::zombie_ignore=d.zombie_ignore; menu_state::god_mode=d.god_mode;
-		menu_state::anti_hunger=d.anti_hunger; menu_state::anti_encumbrance=d.anti_encumbrance; menu_state::anti_thirst=d.anti_thirst;
-		menu_state::auto_heal=d.auto_heal;
+		menu_state::anti_hunger=d.anti_hunger; menu_state::unlimited_carry=d.unlimited_carry; menu_state::anti_thirst=d.anti_thirst;
+		menu_state::auto_heal=d.auto_heal; menu_state::infinite_ammo=d.infinite_ammo;
 		menu_state::zombie_esp_enabled=d.ze_en; menu_state::zombie_esp_max_dist=d.ze_dist;
 		menu_state::zombie_esp_box=d.ze_box; menu_state::zombie_esp_name=d.ze_name;
 		menu_state::zombie_esp_health=d.ze_hp; menu_state::zombie_esp_show_dist=d.ze_sd;
@@ -615,8 +620,9 @@ void Menu::Settings() {
 			// Row 4: Reset
 			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(42.f);
 			if(ImGui::Button("Reset settings",ImVec2(174.f,22.f))){
-				menu_state::full_bright=menu_state::zombie_ignore=menu_state::god_mode=false;
-				menu_state::anti_hunger=menu_state::anti_encumbrance=menu_state::anti_thirst=false;
+				menu_state::full_bright=menu_state::night_vision=menu_state::zombie_ignore=menu_state::god_mode=false;
+				menu_state::anti_hunger=menu_state::unlimited_carry=menu_state::anti_thirst=false;
+				menu_state::auto_heal=menu_state::infinite_ammo=false;
 				menu_state::zombie_esp_enabled=menu_state::player_esp_enabled=true;
 				menu_state::zombie_esp_max_dist=menu_state::player_esp_max_dist=50.f;
 				menu_state::esp_render_enabled=true; menu_state::menu_key=VK_INSERT;
@@ -648,11 +654,28 @@ void Menu::Settings() {
 
 // ====================== ESP Overlay ===============================
 void DrawOverlay(){
-	ImDrawList*fg=ImGui::GetForegroundDrawList();
-	if(menu_state::esp_render_enabled&&g_game_ready){
+	// Use a fullscreen transparent window for ESP draws. GetForegroundDrawList()
+	// and GetBackgroundDrawList() are NOT rendered by this project's old custom
+	// ImGui backend. Only window draw lists get processed by RenderDrawData().
+	ImGui::SetNextWindowPos(ImVec2(0,0));
+	ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+	ImGui::PushStyleColor(ImGuiCol_WindowBg,ImVec4(0,0,0,0));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0.f);
+	ImGui::Begin("##espoverlay",nullptr,
+		ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|
+		ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse|
+		ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoInputs|
+		ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoFocusOnAppearing|
+		ImGuiWindowFlags_NoNavFocus|ImGuiWindowFlags_NoNav);
+	ImDrawList*dl=ImGui::GetWindowDrawList();
+	ImGui::PopStyleVar(2);
+	ImGui::PopStyleColor();
+
+	const float zoom=pz::projection_zoom();
+	if(menu_state::esp_render_enabled&&g_game_ready&&zoom>0.0f){
 		for(auto&e:g_entities){
 			if(e.is_local||!e.on_screen)continue;
-			// Skip NaN positions (unloaded animals etc)
 			if(e.sx!=e.sx||e.sy!=e.sy||e.dist!=e.dist)continue;
 			const bool z=(e.type==pz::entity_type::zombie);
 			const bool p=(e.type==pz::entity_type::player);
@@ -669,16 +692,19 @@ void DrawOverlay(){
 			if(!enabled||e.dist>max_d||!cc)continue;
 			ImU32 col=IM_COL32((int)(cc[0]*255),(int)(cc[1]*255),(int)(cc[2]*255),(int)(cc[3]*255));
 			ImU32 shadow=IM_COL32(0,0,0,200);
-			float bw=14.0f, bh=(z||p)?56.0f:v?40.0f:a?36.0f:0.0f;
+			const auto kind=(z||p)?pz::projection::esp_kind::humanoid:
+				v?pz::projection::esp_kind::vehicle:a?pz::projection::esp_kind::animal:pz::projection::esp_kind::item;
+			const auto box=pz::projection::esp_box_for(kind,e.sx,e.sy,zoom);
+			const float bh=box.bottom-box.top;
 			// Cornered box with outline shadow
 			if(show_box&&bh>0){
-				float x1=e.sx-bw,y1=e.sy-bh,x2=e.sx+bw,y2=e.sy;
-				float cl=std::min(10.0f,(x2-x1)*0.3f);
+				float x1=box.left,y1=box.top,x2=box.right,y2=box.bottom;
+				float cl=std::min(10.0f/zoom,(x2-x1)*0.3f);
 				auto corner=[&](float ax,float ay,float bx_,float by_,float cx,float cy,float dx,float dy){
-					fg->AddLine(ImVec2(ax,ay),ImVec2(bx_,by_),shadow,3.f);
-					fg->AddLine(ImVec2(cx,cy),ImVec2(dx,dy),shadow,3.f);
-					fg->AddLine(ImVec2(ax,ay),ImVec2(bx_,by_),col,1.5f);
-					fg->AddLine(ImVec2(cx,cy),ImVec2(dx,dy),col,1.5f);
+					dl->AddLine(ImVec2(ax,ay),ImVec2(bx_,by_),shadow,3.f);
+					dl->AddLine(ImVec2(cx,cy),ImVec2(dx,dy),shadow,3.f);
+					dl->AddLine(ImVec2(ax,ay),ImVec2(bx_,by_),col,1.5f);
+					dl->AddLine(ImVec2(cx,cy),ImVec2(dx,dy),col,1.5f);
 				};
 				corner(x1,y1,x1+cl,y1, x1,y1,x1,y1+cl);
 				corner(x2,y1,x2-cl,y1, x2,y1,x2,y1+cl);
@@ -687,54 +713,48 @@ void DrawOverlay(){
 				if(show_hp&&e.health>0){
 					float fill=std::clamp(e.health/100.0f,0.0f,1.0f);
 					float bx=x1-7;
-					fg->AddRectFilled(ImVec2(bx-3,y1-1),ImVec2(bx+1,y2+1),IM_COL32(0,0,0,160));
+					dl->AddRectFilled(ImVec2(bx-3,y1-1),ImVec2(bx+1,y2+1),IM_COL32(0,0,0,160));
 					ImU32 bc=IM_COL32((int)((1.f-fill)*255),(int)(fill*255),0,255);
-					fg->AddRectFilled(ImVec2(bx-2,y1+bh*(1-fill)),ImVec2(bx,y2),bc);
+					dl->AddRectFilled(ImVec2(bx-2,y1+bh*(1-fill)),ImVec2(bx,y2),bc);
 				}
 			}
-			float ty=e.sy-bh-4;
+			float ty=box.top;
 			if(show_name){
 				ImVec2 ts=ImGui::CalcTextSize(e.name);
+				ty=pz::projection::label_above(ty,ts.y);
 				float tx=e.sx-ts.x*0.5f;
-				fg->AddText(ImVec2(tx+1,ty+1),shadow,e.name);
-				fg->AddText(ImVec2(tx,ty),IM_COL32(255,255,255,230),e.name);
-				ty-=14;
+				dl->AddText(ImVec2(tx+1,ty+1),shadow,e.name);
+				dl->AddText(ImVec2(tx,ty),IM_COL32(255,255,255,230),e.name);
 			}
 			if(show_dist){
 				char d[32];_snprintf_s(d,sizeof(d),_TRUNCATE,"%.0fm",e.dist);
 				ImVec2 ds=ImGui::CalcTextSize(d);
-				float dx=e.sx-ds.x*0.5f,dy=e.sy+4;
-				fg->AddText(ImVec2(dx+1,dy+1),shadow,d);
-				fg->AddText(ImVec2(dx,dy),IM_COL32(200,200,200,200),d);
+				float dx=e.sx-ds.x*0.5f,dy=pz::projection::label_above(ty,ds.y);
+				dl->AddText(ImVec2(dx+1,dy+1),shadow,d);
+				dl->AddText(ImVec2(dx,dy),IM_COL32(200,200,200,200),d);
 			}
 		}
 	}
-	// ESP rendering test: bright indicators to verify draw list works
-	if(menu_state::esp_render_enabled&&g_game_ready&&!g_entities.empty()){
-		// Draw entity count in top-right corner (always visible proof ESP is running)
-		char esp_info[128];
-		int eon=0; for(auto&e:g_entities) if(e.on_screen&&e.dist==e.dist) ++eon;
-		_snprintf_s(esp_info,sizeof(esp_info),_TRUNCATE,"ESP: %d/%d on-screen",(int)eon,(int)g_entities.size());
-		fg->AddRectFilled(ImVec2(1500,20),ImVec2(1900,42),IM_COL32(0,0,0,180));
-		fg->AddText(ImVec2(1505,23),IM_COL32(0,255,0,255),esp_info);
-		// Draw bright crosshair at each on-screen entity position
-		for(auto&e:g_entities){
-			if(!e.on_screen||e.sx!=e.sx||e.sy!=e.sy)continue;
-			fg->AddLine(ImVec2(e.sx-20,e.sy),ImVec2(e.sx+20,e.sy),IM_COL32(255,0,0,255),3.f);
-			fg->AddLine(ImVec2(e.sx,e.sy-20),ImVec2(e.sx,e.sy+20),IM_COL32(255,0,0,255),3.f);
-			fg->AddCircle(ImVec2(e.sx,e.sy),25.f,IM_COL32(255,255,0,255),12,2.f);
-		}
+	// ESP status indicator (top-right, always visible when game ready)
+	if(g_game_ready&&menu_state::esp_render_enabled){
+		char info[64]; int eon=0;
+		for(auto&e:g_entities) if(e.on_screen&&e.dist==e.dist) ++eon;
+		_snprintf_s(info,sizeof(info),_TRUNCATE,"ESP: %d/%d visible",eon,(int)g_entities.size());
+		dl->AddRectFilled(ImVec2(1550,8),ImVec2(1910,28),IM_COL32(0,0,0,180));
+		dl->AddText(ImVec2(1555,10),IM_COL32(0,255,0,255),info);
 	}
-	{// Watermark
+	// Watermark
+	{
 		const char*t="pz-int";ImVec2 ts=ImGui::CalcTextSize(t);
 		float w=ts.x+16,h=ts.y+16;ImVec2 p(20,20);
-		fg->AddRectFilledMultiColor(p,ImVec2(p.x+w/2,p.y+2),ImColor(55,177,218),ImColor(201,84,192),ImColor(201,84,192),ImColor(55,177,218));
-		fg->AddRectFilledMultiColor(ImVec2(p.x+w/2,p.y),ImVec2(p.x+w,p.y+2),ImColor(201,84,192),ImColor(204,227,54),ImColor(204,227,54),ImColor(201,84,192));
-		fg->AddRectFilled(ImVec2(p.x,p.y+2),ImVec2(p.x+w,p.y+h),ImColor(17,17,17,255));
-		fg->AddRect(p,ImVec2(p.x+w,p.y+h),ImColor(60,60,60,255),0,0,1);
-		fg->AddText(ImVec2(p.x+9,p.y+9),ImColor(0,0,0,180),t);
-		fg->AddText(ImVec2(p.x+8,p.y+8),ImColor(255,255,255,255),t);
+		dl->AddRectFilledMultiColor(p,ImVec2(p.x+w/2,p.y+2),ImColor(55,177,218),ImColor(201,84,192),ImColor(201,84,192),ImColor(55,177,218));
+		dl->AddRectFilledMultiColor(ImVec2(p.x+w/2,p.y),ImVec2(p.x+w,p.y+2),ImColor(201,84,192),ImColor(204,227,54),ImColor(204,227,54),ImColor(201,84,192));
+		dl->AddRectFilled(ImVec2(p.x,p.y+2),ImVec2(p.x+w,p.y+h),ImColor(17,17,17,255));
+		dl->AddRect(p,ImVec2(p.x+w,p.y+h),ImColor(60,60,60,255),0,0,1);
+		dl->AddText(ImVec2(p.x+9,p.y+9),ImColor(0,0,0,180),t);
+		dl->AddText(ImVec2(p.x+8,p.y+8),ImColor(255,255,255,255),t);
 	}
+	ImGui::End();
 }
 
 // ====================== Tab 4: Debug ======================================
@@ -769,7 +789,7 @@ void Menu::Debug() {
 		status("IsoUtils Projection", d.isoutils_available);
 		status("Climate Method API", d.climate_method_api);
 		status("Climate Fields", d.climate_fields_ok);
-		status("Container Sync (MP)", d.container_sync_ok);
+        status("World Spawn API", d.world_spawn_api_available);
 		ImGui::Spacing();
 
 		ImGui::TextColored(ImVec4(0.47f,0.68f,0.86f,1.f),"=== Frame Context ===");
@@ -809,7 +829,15 @@ void Menu::Debug() {
 		ImGui::Text("Night vision: %s", menu_state::night_vision?"ON":"off");
 		ImGui::Text("Auto heal: %s", menu_state::auto_heal?"ON":"off");
 		ImGui::Text("Zombie ignore: %s", menu_state::zombie_ignore?"ON":"off");
+		ImGui::Text("Unlimited carry: %s", menu_state::unlimited_carry?"ON":"off");
+		ImGui::Text("Infinite ammo: %s", menu_state::infinite_ammo?"ON":"off");
 		ImGui::Text("ESP render: %s", menu_state::esp_render_enabled?"ON":"off");
+        ImGui::Text("ESP types: Z=%s P=%s V=%s A=%s I=%s",
+            menu_state::zombie_esp_enabled?"ON":"off",
+            menu_state::player_esp_enabled?"ON":"off",
+            menu_state::vehicle_esp_enabled?"ON":"off",
+            menu_state::animal_esp_enabled?"ON":"off",
+            menu_state::item_esp_enabled?"ON":"off");
 		ImGui::Spacing();ImGui::Spacing();
 
 		// Big red DUMP button

@@ -30,9 +30,10 @@ namespace menu_state {
 	extern bool zombie_ignore;
 	extern bool god_mode;
 	extern bool anti_hunger;
-	extern bool anti_encumbrance;
+	extern bool unlimited_carry;
 	extern bool anti_thirst;
 	extern bool auto_heal;
+	extern bool infinite_ammo;
 
 	extern bool  zombie_esp_enabled;
 	extern float zombie_esp_max_dist;

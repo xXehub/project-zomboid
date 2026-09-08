@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "pz_game.h"
+#include "projection.h"
 
 // ============================================================================
 // logging (mirrors main_entry.cpp pzlog, separate copy for the bridge)
@@ -119,6 +120,7 @@ namespace pzj {
         jclass isoMovingObject{};
         jclass isoWorld{};
         jclass isoCell{};
+        jclass isoGridSquare{};
         jclass isoCamera{};
         jclass gameClient{};
         jclass climateManager{};
@@ -126,7 +128,6 @@ namespace pzj {
         jclass scriptManager{};
         jclass itemScript{};
         jclass inventoryItem{};
-        jclass itemContainer{};
         jclass handWeapon{};
         jclass itemFactory{};
         jclass bodyDamage{};
@@ -151,14 +152,16 @@ namespace pzj {
         jmethodID char_getX{};
         jmethodID char_getY{};
         jmethodID char_getZ{};
+        jmethodID char_getSquare{};
         jmethodID char_getName{};
         jmethodID char_getHealth{};
-        jmethodID char_getInventory{};
         jmethodID char_getBodyDamage{};
         jmethodID char_getStats{};
         jmethodID char_setHealth{};
         jmethodID char_getMaxWeight{};
         jmethodID char_setMaxWeight{};
+        jmethodID char_getPrimaryHandItem{};
+        jmethodID handweapon_getMaxAmmo{};
         jfieldID char_invincible{};
 
         // IsoZombie / IsoWorld / IsoCell
@@ -166,11 +169,11 @@ namespace pzj {
         jmethodID zombie_setTarget{};
         jfieldID world_instance{};
         jfieldID world_currentCell{};
-        jfieldID world_zombieWithModel{};
         jmethodID cell_getZombieList{};
 
         // GameClient
         jfieldID gameclient_instance{};
+        jfieldID gameclient_client{};
         jmethodID gameclient_getPlayers{};
 
         // IsoCamera / Core
@@ -199,10 +202,6 @@ namespace pzj {
         jmethodID climatefloat_setEnableOverride{}; // (Z)V
         jmethodID climatefloat_setFinalValue{};     // (F)V
 
-        // ItemContainer sync for multiplayer
-        jmethodID container_setDirty{};             // (Z)V
-        jmethodID container_setDrawDirty{};         // (Z)V
-        jmethodID container_requestSync{};          // ()V
         jfieldID climate_isOverrideValue{};
         jfieldID climate_finalValue{};
 
@@ -218,11 +217,9 @@ namespace pzj {
         jmethodID item_getFullName{};
         jmethodID item_getDisplayName{};
 
-        // InventoryItem / ItemContainer / factory
+        // InventoryItem / factory
         jmethodID inv_setCurrentAmmoCount{};
         jmethodID inv_setCondition{};
-        jmethodID inv_isRanged{};
-        jmethodID container_AddItem_str{};
         jmethodID factory_CreateItem_str_f{};
         jmethodID factory_CreateItem_str{};
 
@@ -277,10 +274,13 @@ namespace pzj {
         jmethodID vehicle_getEngineCondition{};
         jmethodID vehicle_getCurrentSpeedKmHour{};
 
-        // Cell -> animals / ground items
+        // Cell / square entity and world-item access
         jmethodID world_getCell{};
         jmethodID cell_getAnimals{};
-        jmethodID cell_getProcessWorldItems{};
+        jmethodID square_getRadius{};
+        jmethodID square_getWorldObjects{};
+        jmethodID square_addWorldItem_str{};
+        jmethodID square_addWorldItem_obj{};
 
         // Animal ESP
         jmethodID animal_getAnimalType{};
@@ -539,6 +539,7 @@ namespace pzj {
         c.isoMovingObject = fc("zombie/iso/IsoMovingObject");
         c.isoWorld = fc("zombie/iso/IsoWorld");
         c.isoCell = fc("zombie/iso/IsoCell");
+        c.isoGridSquare = fc("zombie/iso/IsoGridSquare");
         c.isoCamera = fc("zombie/iso/IsoCamera");
         c.gameClient = fc("zombie/network/GameClient");
         c.climateManager = fc("zombie/iso/weather/ClimateManager");
@@ -546,7 +547,6 @@ namespace pzj {
         c.scriptManager = fc("zombie/scripting/ScriptManager");
         c.itemScript = fc("zombie/scripting/objects/Item");
         c.inventoryItem = fc("zombie/inventory/InventoryItem");
-        c.itemContainer = fc("zombie/inventory/ItemContainer");
         c.handWeapon = fc("zombie/inventory/types/HandWeapon");
         c.itemFactory = fc("zombie/inventory/InventoryItemFactory");
         c.bodyDamage = fc("zombie/characters/BodyDamage/BodyDamage");
@@ -570,11 +570,11 @@ namespace pzj {
         m.char_getX = gm(c.isoGameCharacter, "getX", "()F");
         m.char_getY = gm(c.isoGameCharacter, "getY", "()F");
         m.char_getZ = gm(c.isoGameCharacter, "getZ", "()F");
+        m.char_getSquare = gm(c.isoMovingObject, "getSquare",
+            "()Lzombie/iso/IsoGridSquare;");
         m.char_getName = gm(c.isoPlayer, "getDisplayName",
             "()Ljava/lang/String;");
         m.char_getHealth = gm(c.isoGameCharacter, "getHealth", "()F");
-        m.char_getInventory = gm(c.isoGameCharacter, "getInventory",
-            "()Lzombie/inventory/ItemContainer;");
         m.char_getBodyDamage = gm(c.isoGameCharacter, "getBodyDamage",
             "()Lzombie/characters/BodyDamage/BodyDamage;");
         m.char_getStats = gm(c.isoGameCharacter, "getStats",
@@ -582,6 +582,9 @@ namespace pzj {
         m.char_setHealth = gm(c.isoGameCharacter, "setHealth", "(F)V");
         m.char_getMaxWeight = gm(c.isoGameCharacter, "getMaxWeight", "()I");
         m.char_setMaxWeight = gm(c.isoGameCharacter, "setMaxWeight", "(I)V");
+        m.char_getPrimaryHandItem = gm(c.isoGameCharacter, "getPrimaryHandItem",
+            "()Lzombie/inventory/InventoryItem;");
+        m.handweapon_getMaxAmmo = gm(c.handWeapon, "getMaxAmmo", "()I");
         m.char_invincible = if_(c.isoGameCharacter, "invincible", "Z");
 
         m.zombie_getTarget = gm(c.isoZombie, "getTarget",
@@ -590,13 +593,12 @@ namespace pzj {
             "(Lzombie/iso/IsoMovingObject;)V");
         m.world_instance = sf(c.isoWorld, "instance", "Lzombie/iso/IsoWorld;");
         m.world_currentCell = if_(c.isoWorld, "currentCell", "Lzombie/iso/IsoCell;");
-        m.world_zombieWithModel = if_(c.isoWorld, "zombieWithModel",
-            "Lzombie/util/list/PZArrayList;");
         m.cell_getZombieList = gm(c.isoCell, "getZombieList",
             "()Ljava/util/ArrayList;");
 
         m.gameclient_instance = sf(c.gameClient, "instance",
             "Lzombie/network/GameClient;");
+        m.gameclient_client = sf(c.gameClient, "client", "Z");
         m.gameclient_getPlayers = gm(c.gameClient, "getPlayers",
             "()Ljava/util/ArrayList;");
 
@@ -659,18 +661,10 @@ namespace pzj {
         m.inv_setCurrentAmmoCount = gm(c.inventoryItem,
             "setCurrentAmmoCount", "(I)V");
         m.inv_setCondition = gm(c.inventoryItem, "setCondition", "(I)V");
-        m.inv_isRanged = gm(c.handWeapon, "isRanged", "()Z");
-        m.container_AddItem_str = gm(c.itemContainer, "AddItem",
-            "(Ljava/lang/String;)Lzombie/inventory/InventoryItem;");
         m.factory_CreateItem_str_f = sm(c.itemFactory, "CreateItem",
             "(Ljava/lang/String;F)Lzombie/inventory/InventoryItem;");
         m.factory_CreateItem_str = sm(c.itemFactory, "CreateItem",
             "(Ljava/lang/String;)Lzombie/inventory/InventoryItem;");
-
-        // ItemContainer sync for MP
-        m.container_setDirty = gm(c.itemContainer, "setDirty", "(Z)V");
-        m.container_setDrawDirty = gm(c.itemContainer, "setDrawDirty", "(Z)V");
-        m.container_requestSync = gm(c.itemContainer, "requestSync", "()V");
 
         m.bodydamage_RestoreToFullHealth = gm(c.bodyDamage,
             "RestoreToFullHealth", "()V");
@@ -716,11 +710,16 @@ namespace pzj {
         m.vehicle_getEngineCondition = gm(c.baseVehicle, "getEngineCondition", "()I");
         m.vehicle_getCurrentSpeedKmHour = gm(c.baseVehicle, "getCurrentSpeedKmHour", "()F");
 
-        // Cell -> animals / ground items methods
+        // Cell / square entity and world-item methods
         m.world_getCell = gm(c.isoWorld, "getCell", "()Lzombie/iso/IsoCell;");
         m.cell_getAnimals = gm(c.isoCell, "getAnimals", "()Ljava/util/List;");
-        m.cell_getProcessWorldItems = gm(c.isoCell, "getProcessWorldItems",
+        m.square_getRadius = gm(c.isoGridSquare, "getRadius", "(I)Ljava/util/List;");
+        m.square_getWorldObjects = gm(c.isoGridSquare, "getWorldObjects",
             "()Ljava/util/ArrayList;");
+        m.square_addWorldItem_str = gm(c.isoGridSquare, "AddWorldInventoryItem",
+            "(Ljava/lang/String;FFFZZ)Lzombie/inventory/InventoryItem;");
+        m.square_addWorldItem_obj = gm(c.isoGridSquare, "AddWorldInventoryItem",
+            "(Lzombie/inventory/InventoryItem;FFFZZ)Lzombie/inventory/InventoryItem;");
 
         // Animal ESP methods
         m.animal_getAnimalType = gm(c.isoAnimal, "getAnimalType",
@@ -747,11 +746,12 @@ namespace pzj {
         m.stat_unhappiness = sf(c.characterStat, "UNHAPPINESS", cs_sig);
         if (g_env->ExceptionCheck()) g_env->ExceptionClear();
         const bool required_ok = c.isoPlayer && c.isoGameCharacter &&
-            c.isoWorld && c.isoCamera && c.core &&
+            c.isoWorld && c.isoCell && c.isoGridSquare && c.isoCamera && c.core &&
             m.player_getInstance && m.char_getX && m.char_getY && m.char_getZ &&
-            m.world_instance && m.world_zombieWithModel &&
-            m.cam_getOffX && m.cam_getOffY && m.core_getInstance &&
-            m.core_getScreenWidth && m.core_getScreenHeight && m.core_tileScale;
+            m.char_getSquare && m.world_instance && m.world_getCell &&
+            m.cell_getZombieList && m.cam_getOffX && m.cam_getOffY &&
+            m.core_getInstance && m.core_getScreenWidth &&
+            m.core_getScreenHeight && m.core_tileScale;
         if (!required_ok) {
             pzlog2::once("resolvefail",
                 "required Build 42 JNI members missing");
@@ -782,9 +782,15 @@ namespace pz {
         int tile_scale{ 1 };
         float cam_off_x{ 0.0f };
         float cam_off_y{ 0.0f };
+        float zoom{ 1.0f };
         bool valid{ false };
     };
     static frame_ctx g_frame_ctx;
+
+    float projection_zoom() noexcept
+    {
+        return g_frame_ctx.valid ? g_frame_ctx.zoom : 0.0f;
+    }
 
     // True once a full world (IsoPlayer.getInstance() non-null) was seen.
     static bool g_seen_world = false;
@@ -868,6 +874,14 @@ namespace pz {
             return false;
         }
 
+        c.zoom = g_m.core_getZoom
+            ? g_env->CallFloatMethod(core, g_m.core_getZoom, c.player_idx)
+            : 1.0f;
+        if (g_env->ExceptionCheck() || !std::isfinite(c.zoom) || c.zoom <= 0.0f) {
+            g_env->ExceptionClear();
+            return false;
+        }
+
         c.valid = c.screen_w > 0 && c.screen_h > 0 && c.tile_scale > 0;
         return c.valid;
     }
@@ -881,9 +895,9 @@ namespace pz {
         on_screen = false;
         if (!c.valid) return;
 
-        // Use the game's own IsoUtils.XToScreenExact / YToScreenExact.
-        // This handles zoom, tileScale, and camera offset correctly at
-        // every zoom level — no manual math that can drift from the game.
+        // IsoUtils returns unscaled offscreen-buffer coordinates. Build 42's
+        // own WorldMarkers renderer divides those exact coordinates by zoom
+        // before using them in the screen/UI coordinate space.
         if (g_m.isoutils_XToScreenExact && g_m.isoutils_YToScreenExact &&
             g_cls.isoUtils) {
             sx = g_env->CallStaticFloatMethod(g_cls.isoUtils,
@@ -897,16 +911,23 @@ namespace pz {
                 sx = sy = 0.0f;
                 return;
             }
+            const auto point = projection::from_exact(sx, sy, c.zoom);
+            sx = point.x;
+            sy = point.y;
             on_screen = sx > -64.0f && sy > -64.0f &&
                 sx < static_cast<float>(c.screen_w) + 64.0f &&
                 sy < static_cast<float>(c.screen_h) + 64.0f;
             return;
         }
 
-        // Fallback: manual isometric math (may be inaccurate at non-default zoom)
+        // Fallback mirrors the same raw-offscreen to screen conversion.
         const float scale = static_cast<float>(c.tile_scale);
-        sx = (wx - wy) * 32.0f * scale - c.cam_off_x;
-        sy = (wx + wy) * 16.0f * scale - wz * 96.0f * scale - c.cam_off_y;
+        const auto point = projection::from_exact(
+            (wx - wy) * 32.0f * scale - c.cam_off_x,
+            (wx + wy) * 16.0f * scale - wz * 96.0f * scale - c.cam_off_y,
+            c.zoom);
+        sx = point.x;
+        sy = point.y;
         on_screen = sx > -64.0f && sy > -64.0f &&
             sx < static_cast<float>(c.screen_w) + 64.0f &&
             sy < static_cast<float>(c.screen_h) + 64.0f;
@@ -1072,7 +1093,7 @@ namespace pz {
             return;
         }
 
-        pzj::jframe frame{ 256 };
+        pzj::jframe frame{ 1024 };
         if (!frame.ok || !refresh_frame_ctx()) {
             for (auto& entry : out) entry.on_screen = false;
             return;
@@ -1080,21 +1101,28 @@ namespace pz {
 
         using clock = std::chrono::steady_clock;
         static auto next_refresh = clock::time_point{};
+        static auto next_item_refresh = clock::time_point{};
+        static std::vector<entity> ground_items;
         constexpr auto refresh_interval = std::chrono::milliseconds{ 50 };
-        constexpr jint max_visible_zombies{ 128 };
+        constexpr auto item_refresh_interval = std::chrono::milliseconds{ 500 };
+        constexpr jint max_zombies{ 512 };
         constexpr jint max_vehicles{ 64 };
         constexpr jint max_animals{ 64 };
-        constexpr jint max_items{ 64 };
+        constexpr std::size_t max_ground_items{ 128 };
+        constexpr std::size_t max_item_candidates{ 512 };
+        constexpr jint item_scan_diameter{ 61 }; // getRadius halves this to 30 tiles.
         const auto now = clock::now();
 
         if (now >= next_refresh) {
             std::vector<entity> fresh;
-            fresh.reserve(384);
+            fresh.reserve(512);
 
             const auto player = static_cast<jobject>(
                 g_env->CallStaticObjectMethod(g_cls.isoPlayer, g_m.player_getInstance));
             if (g_env->ExceptionCheck() || !player) {
                 g_env->ExceptionClear();
+                ground_items.clear();
+                next_item_refresh = {};
                 out.clear();
                 return;
             }
@@ -1110,71 +1138,43 @@ namespace pz {
             const auto world = static_cast<jobject>(
                 g_env->GetStaticObjectField(g_cls.isoWorld, g_m.world_instance));
             if (!g_env->ExceptionCheck() && world) {
-                // ---- zombies ----
-                const auto visible_zombies = static_cast<jobject>(
-                    g_env->GetObjectField(world, g_m.world_zombieWithModel));
-                if (!g_env->ExceptionCheck() && visible_zombies) {
-                    const jint size = g_env->CallIntMethod(visible_zombies, g_m.list_size);
-                    const jint count = std::clamp(size, jint{ 0 }, max_visible_zombies);
-                    for (jint i = 0; i < count; ++i) {
-                        const auto zombie = static_cast<jobject>(
-                            g_env->CallObjectMethod(visible_zombies, g_m.list_get, i));
-                        if (g_env->ExceptionCheck() || !zombie) {
-                            g_env->ExceptionClear();
-                            continue;
-                        }
-                        entity entry;
-                        fill_entity(zombie, lx, ly, entity_type::zombie, entry);
-                        fresh.push_back(entry);
-                        g_env->DeleteLocalRef(zombie);
-                    }
-                } else {
+                auto cell = static_cast<jobject>(
+                    g_env->CallObjectMethod(world, g_m.world_getCell));
+                if (g_env->ExceptionCheck() || !cell) {
                     g_env->ExceptionClear();
-                }
-
-                // ---- vehicles (VehicleManager.instance.getVehicles()) ----
-                if (g_cls.vehicleManager && g_m.vehiclemanager_instance &&
-                    g_m.vehiclemanager_getVehicles) {
-                    const auto vm = static_cast<jobject>(
-                        g_env->GetStaticObjectField(g_cls.vehicleManager,
-                            g_m.vehiclemanager_instance));
-                    if (!g_env->ExceptionCheck() && vm) {
-                        const auto vehs = static_cast<jobject>(
-                            g_env->CallObjectMethod(vm, g_m.vehiclemanager_getVehicles));
-                        if (!g_env->ExceptionCheck() && vehs) {
-                            const jint size = g_env->CallIntMethod(vehs, g_m.list_size);
-                            const jint count = std::clamp(size, jint{ 0 }, max_vehicles);
-                            for (jint i = 0; i < count; ++i) {
-                                const auto v = static_cast<jobject>(
-                                    g_env->CallObjectMethod(vehs, g_m.list_get, i));
-                                if (g_env->ExceptionCheck() || !v) {
-                                    g_env->ExceptionClear(); continue;
-                                }
-                                entity entry;
-                                fill_vehicle(v, lx, ly, entry);
-                                fresh.push_back(entry);
-                                g_env->DeleteLocalRef(v);
-                            }
-                        } else { g_env->ExceptionClear(); }
-                    } else { g_env->ExceptionClear(); }
-                }
-
-                // ---- animals + ground items via IsoCell ----
-                jobject cell = nullptr;
-                if (g_m.world_getCell) {
-                    cell = static_cast<jobject>(
-                        g_env->CallObjectMethod(world, g_m.world_getCell));
-                    if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); cell = nullptr; }
-                }
-                if (!cell) {
-                    // fallback: direct field
                     cell = static_cast<jobject>(
                         g_env->GetObjectField(world, g_m.world_currentCell));
-                    if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); cell = nullptr; }
+                    if (g_env->ExceptionCheck()) {
+                        g_env->ExceptionClear();
+                        cell = nullptr;
+                    }
                 }
 
                 if (cell) {
-                    // ---- animals ----
+                    // IsoCell owns the complete loaded zombie list. The old
+                    // IsoWorld.zombieWithModel source is only a transient
+                    // renderer list and is frequently empty outside its pass.
+                    const auto zombies = static_cast<jobject>(
+                        g_env->CallObjectMethod(cell, g_m.cell_getZombieList));
+                    if (!g_env->ExceptionCheck() && zombies) {
+                        const jint size = g_env->CallIntMethod(zombies, g_m.list_size);
+                        const jint count = std::clamp(size, jint{ 0 }, max_zombies);
+                        for (jint i = 0; i < count; ++i) {
+                            const auto zombie = static_cast<jobject>(
+                                g_env->CallObjectMethod(zombies, g_m.list_get, i));
+                            if (g_env->ExceptionCheck() || !zombie) {
+                                g_env->ExceptionClear();
+                                continue;
+                            }
+                            entity entry;
+                            fill_entity(zombie, lx, ly, entity_type::zombie, entry);
+                            fresh.push_back(entry);
+                            g_env->DeleteLocalRef(zombie);
+                        }
+                    } else {
+                        g_env->ExceptionClear();
+                    }
+
                     if (g_m.cell_getAnimals) {
                         const auto animals = static_cast<jobject>(
                             g_env->CallObjectMethod(cell, g_m.cell_getAnimals));
@@ -1182,49 +1182,152 @@ namespace pz {
                             const jint size = g_env->CallIntMethod(animals, g_m.list_size);
                             const jint count = std::clamp(size, jint{ 0 }, max_animals);
                             for (jint i = 0; i < count; ++i) {
-                                const auto a = static_cast<jobject>(
+                                const auto animal = static_cast<jobject>(
                                     g_env->CallObjectMethod(animals, g_m.list_get, i));
-                                if (g_env->ExceptionCheck() || !a) {
-                                    g_env->ExceptionClear(); continue;
+                                if (g_env->ExceptionCheck() || !animal) {
+                                    g_env->ExceptionClear();
+                                    continue;
                                 }
                                 entity entry;
-                                fill_animal(a, lx, ly, entry);
+                                fill_animal(animal, lx, ly, entry);
                                 fresh.push_back(entry);
-                                g_env->DeleteLocalRef(a);
+                                g_env->DeleteLocalRef(animal);
                             }
-                        } else { g_env->ExceptionClear(); }
+                        } else {
+                            g_env->ExceptionClear();
+                        }
                     }
 
-                    // ---- ground items ----
-                    if (g_m.cell_getProcessWorldItems) {
-                        const auto items = static_cast<jobject>(
-                            g_env->CallObjectMethod(cell, g_m.cell_getProcessWorldItems));
-                        if (!g_env->ExceptionCheck() && items) {
-                            const jint size = g_env->CallIntMethod(items, g_m.list_size);
-                            const jint count = std::clamp(size, jint{ 0 }, max_items);
+                    // Static ground items are not guaranteed to exist in
+                    // IsoCell.processWorldItems. Walk loaded squares near the
+                    // player at a lower cadence and keep the nearest entries.
+                    if (now >= next_item_refresh) {
+                        std::vector<entity> scanned_items;
+                        scanned_items.reserve(max_ground_items);
+
+                        if (g_m.char_getSquare && g_m.square_getRadius &&
+                            g_m.square_getWorldObjects) {
+                            const auto player_square = static_cast<jobject>(
+                                g_env->CallObjectMethod(player, g_m.char_getSquare));
+                            if (!g_env->ExceptionCheck() && player_square) {
+                                const auto squares = static_cast<jobject>(
+                                    g_env->CallObjectMethod(player_square,
+                                        g_m.square_getRadius, item_scan_diameter));
+                                if (!g_env->ExceptionCheck() && squares) {
+                                    const jint square_count = g_env->CallIntMethod(
+                                        squares, g_m.list_size);
+                                    if (!g_env->ExceptionCheck()) {
+                                        for (jint i = 0; i < square_count &&
+                                            scanned_items.size() < max_item_candidates; ++i) {
+                                            const auto square = static_cast<jobject>(
+                                                g_env->CallObjectMethod(squares,
+                                                    g_m.list_get, i));
+                                            if (g_env->ExceptionCheck() || !square) {
+                                                g_env->ExceptionClear();
+                                                continue;
+                                            }
+                                            const auto items = static_cast<jobject>(
+                                                g_env->CallObjectMethod(square,
+                                                    g_m.square_getWorldObjects));
+                                            if (!g_env->ExceptionCheck() && items) {
+                                                const jint item_count = g_env->CallIntMethod(
+                                                    items, g_m.list_size);
+                                                if (!g_env->ExceptionCheck()) {
+                                                    for (jint j = 0; j < item_count &&
+                                                        scanned_items.size() < max_item_candidates; ++j) {
+                                                        const auto item = static_cast<jobject>(
+                                                            g_env->CallObjectMethod(items,
+                                                                g_m.list_get, j));
+                                                        if (g_env->ExceptionCheck() || !item) {
+                                                            g_env->ExceptionClear();
+                                                            continue;
+                                                        }
+                                                        entity entry;
+                                                        fill_ground_item(item, lx, ly, entry);
+                                                        scanned_items.push_back(entry);
+                                                        g_env->DeleteLocalRef(item);
+                                                    }
+                                                } else {
+                                                    g_env->ExceptionClear();
+                                                }
+                                                g_env->DeleteLocalRef(items);
+                                            } else {
+                                                g_env->ExceptionClear();
+                                            }
+                                            g_env->DeleteLocalRef(square);
+                                        }
+                                    } else {
+                                        g_env->ExceptionClear();
+                                    }
+                                    g_env->DeleteLocalRef(squares);
+                                } else {
+                                    g_env->ExceptionClear();
+                                }
+                                g_env->DeleteLocalRef(player_square);
+                            } else {
+                                g_env->ExceptionClear();
+                            }
+                        }
+
+                        std::sort(scanned_items.begin(), scanned_items.end(),
+                            [](const entity& lhs, const entity& rhs) {
+                                return lhs.dist < rhs.dist;
+                            });
+                        if (scanned_items.size() > max_ground_items)
+                            scanned_items.resize(max_ground_items);
+                        ground_items.swap(scanned_items);
+                        next_item_refresh = now + item_refresh_interval;
+                    }
+                } else {
+                    ground_items.clear();
+                    next_item_refresh = {};
+                }
+
+                // VehicleManager already exposes the authoritative loaded list.
+                if (g_cls.vehicleManager && g_m.vehiclemanager_instance &&
+                    g_m.vehiclemanager_getVehicles) {
+                    const auto manager = static_cast<jobject>(
+                        g_env->GetStaticObjectField(g_cls.vehicleManager,
+                            g_m.vehiclemanager_instance));
+                    if (!g_env->ExceptionCheck() && manager) {
+                        const auto vehicles = static_cast<jobject>(
+                            g_env->CallObjectMethod(manager,
+                                g_m.vehiclemanager_getVehicles));
+                        if (!g_env->ExceptionCheck() && vehicles) {
+                            const jint size = g_env->CallIntMethod(vehicles, g_m.list_size);
+                            const jint count = std::clamp(size, jint{ 0 }, max_vehicles);
                             for (jint i = 0; i < count; ++i) {
-                                const auto gi = static_cast<jobject>(
-                                    g_env->CallObjectMethod(items, g_m.list_get, i));
-                                if (g_env->ExceptionCheck() || !gi) {
-                                    g_env->ExceptionClear(); continue;
+                                const auto vehicle = static_cast<jobject>(
+                                    g_env->CallObjectMethod(vehicles, g_m.list_get, i));
+                                if (g_env->ExceptionCheck() || !vehicle) {
+                                    g_env->ExceptionClear();
+                                    continue;
                                 }
                                 entity entry;
-                                fill_ground_item(gi, lx, ly, entry);
+                                fill_vehicle(vehicle, lx, ly, entry);
                                 fresh.push_back(entry);
-                                g_env->DeleteLocalRef(gi);
+                                g_env->DeleteLocalRef(vehicle);
                             }
-                        } else { g_env->ExceptionClear(); }
+                        } else {
+                            g_env->ExceptionClear();
+                        }
+                    } else {
+                        g_env->ExceptionClear();
                     }
                 }
             } else {
                 g_env->ExceptionClear();
+                ground_items.clear();
+                next_item_refresh = {};
             }
 
-            // ---- players (multiplayer) ----
+            // GameClient.getPlayers() is rebuilt from IDToPlayerMap and is the
+            // authoritative remote-player collection. Zero is expected in SP.
             if (g_cls.gameClient && g_m.gameclient_instance &&
                 g_m.gameclient_getPlayers) {
                 const auto client = static_cast<jobject>(
-                    g_env->GetStaticObjectField(g_cls.gameClient, g_m.gameclient_instance));
+                    g_env->GetStaticObjectField(g_cls.gameClient,
+                        g_m.gameclient_instance));
                 if (!g_env->ExceptionCheck() && client) {
                     const auto players = static_cast<jobject>(
                         g_env->CallObjectMethod(client, g_m.gameclient_getPlayers));
@@ -1253,6 +1356,7 @@ namespace pz {
                 }
             }
 
+            fresh.insert(fresh.end(), ground_items.begin(), ground_items.end());
             out.swap(fresh);
             next_refresh = now + refresh_interval;
         }
@@ -1395,120 +1499,151 @@ namespace pz {
     // ---- spawning -----------------------------------------------------------
     static char g_last_spawn_msg[128] = "none";
 
+    static bool can_spawn_world_item()
+    {
+        if (!g_cls.gameClient || !g_m.gameclient_client) {
+            ::strcpy_s(g_last_spawn_msg, "spawn refused: network mode unavailable");
+            return false;
+        }
+        const jboolean client = g_env->GetStaticBooleanField(
+            g_cls.gameClient, g_m.gameclient_client);
+        if (g_env->ExceptionCheck()) {
+            g_env->ExceptionClear();
+            ::strcpy_s(g_last_spawn_msg, "spawn refused: network mode lookup failed");
+            return false;
+        }
+        // Installed Build 42 only transmits these world-item overloads from
+        // GameServer. A client-side object would be an unsynchronized pickup.
+        if (client == JNI_TRUE) {
+            ::strcpy_s(g_last_spawn_msg,
+                "spawn refused: multiplayer requires server-side spawning");
+            return false;
+        }
+        return true;
+    }
+
     bool spawn_item(const char* full_type)
     {
+        ::strcpy_s(g_last_spawn_msg, "ground spawn failed");
         if (!full_type || !full_type[0]) return false;
-        if (!pzj::ensure_resolved()) return false;
+        if (!pzj::ensure_resolved() || !g_m.char_getSquare ||
+            !g_m.square_addWorldItem_str) return false;
 
-        pzj::jframe fr;
-        if (!fr.ok) return false;
+        pzj::jframe frame;
+        if (!frame.ok) return false;
+        if (!can_spawn_world_item()) return false;
 
         const auto player = static_cast<jobject>(
             g_env->CallStaticObjectMethod(g_cls.isoPlayer, g_m.player_getInstance));
-        if (g_env->ExceptionCheck() || !player) { g_env->ExceptionClear(); return false; }
-
-        const auto inv = static_cast<jobject>(
-            g_env->CallObjectMethod(player, g_m.char_getInventory));
-        if (g_env->ExceptionCheck() || !inv) { g_env->ExceptionClear(); return false; }
-
-        // Use the game's own ItemContainer.AddItem(String fullType).
-        // This is PZ's native add-item path: it looks up the script by full
-        // type name, creates a properly initialized InventoryItem with correct
-        // module, scriptItem, container linkage, and returns it ready to
-        // wear / equip / use / drop. CreateItem+AddItem(obj) skips the
-        // container-binding step and produces ghost items.
-        jstring jt = pzj::utf8_to_jstr(full_type);
-        const auto added = static_cast<jobject>(
-            g_env->CallObjectMethod(inv, g_m.container_AddItem_str, jt));
-        if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); return false; }
-        const bool ok = (added != nullptr);
-
-        // Sync container state for multiplayer — without this the server
-        // doesn't know about the new item and it becomes a ghost.
-        if (ok) {
-            if (g_m.container_setDirty)
-                g_env->CallVoidMethod(inv, g_m.container_setDirty, JNI_TRUE);
-            if (g_m.container_setDrawDirty)
-                g_env->CallVoidMethod(inv, g_m.container_setDrawDirty, JNI_TRUE);
-            if (g_m.container_requestSync)
-                g_env->CallVoidMethod(inv, g_m.container_requestSync);
-            if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+        if (g_env->ExceptionCheck() || !player) {
+            g_env->ExceptionClear();
+            return false;
+        }
+        const auto square = static_cast<jobject>(
+            g_env->CallObjectMethod(player, g_m.char_getSquare));
+        if (g_env->ExceptionCheck() || !square) {
+            g_env->ExceptionClear();
+            return false;
         }
 
+        const auto type = pzj::utf8_to_jstr(full_type);
+        if (!type) return false;
+        const auto added = static_cast<jobject>(g_env->CallObjectMethod(
+            square, g_m.square_addWorldItem_str, type,
+            0.5f, 0.5f, 0.0f, JNI_TRUE, JNI_TRUE));
+        if (g_env->ExceptionCheck()) {
+            g_env->ExceptionClear();
+            return false;
+        }
+        const bool ok = added != nullptr;
+
         _snprintf_s(g_last_spawn_msg, sizeof(g_last_spawn_msg), _TRUNCATE,
-            "spawn %s -> %s", full_type, ok ? "ok" : "FAIL");
+            "ground spawn %s -> %s", full_type, ok ? "created locally" : "FAIL");
         pzlog2::log("%s", g_last_spawn_msg);
         return ok;
     }
 
     bool spawn_item_custom(const char* full_type, int condition, int ammo)
     {
+        ::strcpy_s(g_last_spawn_msg, "custom ground spawn failed");
         if (!full_type || !full_type[0]) return false;
-        if (!pzj::ensure_resolved()) return false;
+        if (!pzj::ensure_resolved() || !g_m.char_getSquare ||
+            !g_m.square_addWorldItem_obj) return false;
 
-        pzj::jframe fr;
-        if (!fr.ok) return false;
+        pzj::jframe frame;
+        if (!frame.ok) return false;
+        if (!can_spawn_world_item()) return false;
 
-        // CreateItem(String, float) - the float is the condition
-        // multiplier PZ uses for spawned items (1.0 = full).
-        jstring jt = pzj::utf8_to_jstr(full_type);
-        float cond_f = (condition < 0) ? 1.0f : (condition / 100.0f);
+        const auto type = pzj::utf8_to_jstr(full_type);
+        if (!type) return false;
 
-        const auto item = static_cast<jobject>(
-            g_env->CallStaticObjectMethod(g_cls.itemFactory, g_m.factory_CreateItem_str_f, jt, cond_f));
-        if (g_env->ExceptionCheck() || !item) {
-            g_env->ExceptionClear();
-            // Retry with the plain single-arg CreateItem.
-            const auto item2 = static_cast<jobject>(
-                g_env->CallStaticObjectMethod(g_cls.itemFactory, g_m.factory_CreateItem_str, jt));
-            if (g_env->ExceptionCheck() || !item2) { g_env->ExceptionClear(); return false; }
-            return spawn_item(full_type);
+        jobject item = nullptr;
+        if (g_m.factory_CreateItem_str_f) {
+            const float condition_factor = condition < 0
+                ? 1.0f : static_cast<float>(condition) / 100.0f;
+            item = static_cast<jobject>(g_env->CallStaticObjectMethod(
+                g_cls.itemFactory, g_m.factory_CreateItem_str_f, type,
+                condition_factor));
+            if (g_env->ExceptionCheck()) {
+                g_env->ExceptionClear();
+                item = nullptr;
+            }
         }
+        if (!item && g_m.factory_CreateItem_str) {
+            item = static_cast<jobject>(g_env->CallStaticObjectMethod(
+                g_cls.itemFactory, g_m.factory_CreateItem_str, type));
+            if (g_env->ExceptionCheck()) {
+                g_env->ExceptionClear();
+                item = nullptr;
+            }
+        }
+        if (!item) return false;
 
-        // Condition (0-100 scale on the item itself).
         if (condition >= 0 && g_m.inv_setCondition) {
-            g_env->CallVoidMethod(item, g_m.inv_setCondition, static_cast<jint>(condition));
-            if (g_env->ExceptionCheck()) g_env->ExceptionClear();
-        }
-
-        // Ammo: only meaningful for ranged weapons.
-        if (ammo >= 0 && g_cls.handWeapon && g_m.inv_isRanged &&
-            g_env->IsInstanceOf(item, g_cls.handWeapon)) {
-
-            if (g_m.inv_setCurrentAmmoCount) {
-                g_env->CallVoidMethod(item, g_m.inv_setCurrentAmmoCount, static_cast<jint>(ammo));
-                if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+            g_env->CallVoidMethod(item, g_m.inv_setCondition,
+                static_cast<jint>(condition));
+            if (g_env->ExceptionCheck()) {
+                g_env->ExceptionClear();
+                return false;
             }
         }
 
-        // Hand to the player's inventory.
+        if (ammo >= 0 && g_cls.handWeapon &&
+            g_env->IsInstanceOf(item, g_cls.handWeapon) &&
+            g_m.inv_setCurrentAmmoCount) {
+            g_env->CallVoidMethod(item, g_m.inv_setCurrentAmmoCount,
+                static_cast<jint>(ammo));
+            if (g_env->ExceptionCheck()) {
+                g_env->ExceptionClear();
+                return false;
+            }
+        }
+
         const auto player = static_cast<jobject>(
             g_env->CallStaticObjectMethod(g_cls.isoPlayer, g_m.player_getInstance));
-        if (g_env->ExceptionCheck() || !player) { g_env->ExceptionClear(); return false; }
-
-        const auto inv = static_cast<jobject>(
-            g_env->CallObjectMethod(player, g_m.char_getInventory));
-        if (g_env->ExceptionCheck() || !inv) { g_env->ExceptionClear(); return false; }
-
-        // ItemContainer.AddItem(InventoryItem) exists; look it up lazily
-        // (not cached because it shares the name with the String variant).
-        static jmethodID add_item_obj = nullptr;
-        if (!add_item_obj) {
-            add_item_obj = g_env->GetMethodID(g_cls.itemContainer, "AddItem",
-                "(Lzombie/inventory/InventoryItem;)Lzombie/inventory/InventoryItem;");
-            if (!add_item_obj) g_env->ExceptionClear();
+        if (g_env->ExceptionCheck() || !player) {
+            g_env->ExceptionClear();
+            return false;
         }
-        if (!add_item_obj) return false;
+        const auto square = static_cast<jobject>(
+            g_env->CallObjectMethod(player, g_m.char_getSquare));
+        if (g_env->ExceptionCheck() || !square) {
+            g_env->ExceptionClear();
+            return false;
+        }
 
-        const auto added = static_cast<jobject>(
-            g_env->CallObjectMethod(inv, add_item_obj, item));
-        const bool ok = (added != nullptr);
-        if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); return false; }
+        const auto added = static_cast<jobject>(g_env->CallObjectMethod(
+            square, g_m.square_addWorldItem_obj, item,
+            0.5f, 0.5f, 0.0f, JNI_TRUE, JNI_TRUE));
+        if (g_env->ExceptionCheck() || !added) {
+            g_env->ExceptionClear();
+            return false;
+        }
 
         _snprintf_s(g_last_spawn_msg, sizeof(g_last_spawn_msg), _TRUNCATE,
-            "custom %s c=%d a=%d -> %s", full_type, condition, ammo, ok ? "ok" : "FAIL");
+            "custom ground %s c=%d a=%d -> ok", full_type, condition, ammo);
         pzlog2::log("%s", g_last_spawn_msg);
-        return ok;
+        return true;
     }
 
     // ---- debug ---------------------------------------------------------------
@@ -1531,7 +1666,8 @@ namespace pz {
             g_m.climatefloat_setOverride != nullptr);
         d.climate_fields_ok = (g_m.climate_desaturationMember != nullptr &&
             g_m.climate_getInstance != nullptr);
-        d.container_sync_ok = (g_m.container_requestSync != nullptr);
+        d.world_spawn_api_available = g_m.square_addWorldItem_str &&
+            g_m.square_addWorldItem_obj;
         d.zoom = 0.0f;
         if (d.resolved && g_m.core_getZoom && g_cls.core) {
             const auto core = static_cast<jobject>(
@@ -1581,9 +1717,9 @@ namespace pz {
         w("=== CLASSES (null = FAILED) ===");
         #define CLS(name) w("  " #name ": %p", g_cls.name)
         CLS(isoPlayer); CLS(isoZombie); CLS(isoGameCharacter); CLS(isoMovingObject);
-        CLS(isoWorld); CLS(isoCell); CLS(isoCamera); CLS(gameClient);
+        CLS(isoWorld); CLS(isoCell); CLS(isoGridSquare); CLS(isoCamera); CLS(gameClient);
         CLS(climateManager); CLS(climateFloat); CLS(scriptManager); CLS(itemScript);
-        CLS(inventoryItem); CLS(itemContainer); CLS(handWeapon); CLS(itemFactory);
+        CLS(inventoryItem); CLS(handWeapon); CLS(itemFactory);
         CLS(bodyDamage); CLS(bodyPart); CLS(bodyPartType); CLS(stats);
         CLS(characterStat); CLS(systemDisabler); CLS(core);
         CLS(vehicleManager); CLS(baseVehicle); CLS(isoAnimal);
@@ -1595,8 +1731,8 @@ namespace pz {
         w("=== METHODS (null = FAILED) ===");
         #define MTD(name) w("  " #name ": %p", (void*)g_m.name)
         MTD(player_getInstance); MTD(player_getPlayerNum);
-        MTD(char_getX); MTD(char_getY); MTD(char_getZ);
-        MTD(char_getName); MTD(char_getHealth); MTD(char_getInventory);
+        MTD(char_getX); MTD(char_getY); MTD(char_getZ); MTD(char_getSquare);
+        MTD(char_getName); MTD(char_getHealth);
         MTD(char_setHealth); MTD(char_getMaxWeight); MTD(char_setMaxWeight);
         MTD(char_invincible); MTD(char_getBodyDamage); MTD(char_getStats);
         MTD(cam_getOffX); MTD(cam_getOffY); MTD(core_getInstance);
@@ -1611,9 +1747,8 @@ namespace pz {
         MTD(climate_isOverride); MTD(climate_isOverrideValue); MTD(climate_finalValue);
         MTD(climatefloat_setOverride); MTD(climatefloat_setEnableOverride);
         MTD(climatefloat_setFinalValue);
-        w("  -- container sync --");
-        MTD(container_AddItem_str); MTD(container_setDirty);
-        MTD(container_setDrawDirty); MTD(container_requestSync);
+        w("  -- world item spawn --");
+        MTD(square_addWorldItem_str); MTD(square_addWorldItem_obj);
         w("  -- isoutils --");
         MTD(isoutils_XToScreenExact); MTD(isoutils_YToScreenExact);
         w("  -- stats --");
@@ -1622,9 +1757,9 @@ namespace pz {
         w("  -- vehicle --");
         MTD(vehiclemanager_instance); MTD(vehiclemanager_getVehicles);
         MTD(vehicle_getScriptName);
-        w("  -- animal --");
-        MTD(animal_getAnimalType);
-        w("  -- world inv --");
+        w("  -- animal / ground item --");
+        MTD(animal_getAnimalType); MTD(cell_getZombieList);
+        MTD(square_getRadius); MTD(square_getWorldObjects);
         MTD(worldinvobj_getItem); MTD(worldinvobj_getWorldPosX);
         MTD(invitem_getDisplayName);
         #undef MTD
@@ -1744,6 +1879,7 @@ namespace pz {
     static jboolean g_invincible_state = JNI_FALSE;
     static bool g_weight_saved = false;
     static jint g_weight_state = 0;
+    constexpr jint k_forced_carry_capacity{ 500 };
     static survival_features g_last_features{};
 
     static bool same_features(const survival_features& lhs,
@@ -1754,9 +1890,10 @@ namespace pz {
             lhs.zombie_ignore == rhs.zombie_ignore &&
             lhs.god_mode == rhs.god_mode &&
             lhs.anti_hunger == rhs.anti_hunger &&
-            lhs.anti_encumbrance == rhs.anti_encumbrance &&
+            lhs.unlimited_carry == rhs.unlimited_carry &&
             lhs.anti_thirst == rhs.anti_thirst &&
-            lhs.auto_heal == rhs.auto_heal;
+            lhs.auto_heal == rhs.auto_heal &&
+            lhs.infinite_ammo == rhs.infinite_ammo;
     }
 
     // Cure all diseases, infections, wounds, and negative stats on the player.
@@ -2020,6 +2157,52 @@ namespace pz {
         return success && !g_invincible_saved && !g_weight_saved;
     }
 
+    static bool set_current_weapon_ammo_to_max()
+    {
+        if (!g_m.char_getPrimaryHandItem || !g_cls.handWeapon ||
+            !g_m.handweapon_getMaxAmmo || !g_m.inv_setCurrentAmmoCount) {
+            return false;
+        }
+
+        const auto player = static_cast<jobject>(
+            g_env->CallStaticObjectMethod(g_cls.isoPlayer, g_m.player_getInstance));
+        if (g_env->ExceptionCheck() || !player) {
+            g_env->ExceptionClear();
+            return false;
+        }
+
+        const auto held = static_cast<jobject>(
+            g_env->CallObjectMethod(player, g_m.char_getPrimaryHandItem));
+        if (g_env->ExceptionCheck() || !held) {
+            g_env->ExceptionClear();
+            g_env->DeleteLocalRef(player);
+            return false;
+        }
+
+        const bool is_weapon = g_env->IsInstanceOf(held, g_cls.handWeapon) == JNI_TRUE;
+        if (g_env->ExceptionCheck() || !is_weapon) {
+            g_env->ExceptionClear();
+            g_env->DeleteLocalRef(held);
+            g_env->DeleteLocalRef(player);
+            return false;
+        }
+
+        const jint max_ammo = g_env->CallIntMethod(held, g_m.handweapon_getMaxAmmo);
+        if (g_env->ExceptionCheck() || max_ammo <= 0) {
+            g_env->ExceptionClear();
+            g_env->DeleteLocalRef(held);
+            g_env->DeleteLocalRef(player);
+            return false;
+        }
+
+        g_env->CallVoidMethod(held, g_m.inv_setCurrentAmmoCount, max_ammo);
+        const bool ok = !g_env->ExceptionCheck();
+        if (!ok) g_env->ExceptionClear();
+        g_env->DeleteLocalRef(held);
+        g_env->DeleteLocalRef(player);
+        return ok;
+    }
+
     void apply_survival_features(const survival_features& features)
     {
         if (!pzj::ensure_resolved()) return;
@@ -2077,7 +2260,8 @@ namespace pz {
         }
 
         const bool needs_player = features.god_mode || features.anti_hunger ||
-            features.anti_encumbrance || features.anti_thirst ||
+            features.unlimited_carry || features.anti_thirst ||
+            features.auto_heal || features.infinite_ammo ||
             g_invincible_saved || g_weight_saved;
         jobject player = nullptr;
         if (needs_player) {
@@ -2095,7 +2279,7 @@ namespace pz {
             return;
         }
         if (player && !g_survival_player &&
-            (features.god_mode || features.anti_encumbrance)) {
+            (features.god_mode || features.unlimited_carry)) {
             g_survival_player = g_env->NewGlobalRef(player);
             if (g_env->ExceptionCheck()) {
                 g_env->ExceptionClear();
@@ -2157,7 +2341,7 @@ namespace pz {
             }
         }
 
-        if (player && features.anti_encumbrance && g_survival_player &&
+        if (player && features.unlimited_carry && g_survival_player &&
             g_m.char_getMaxWeight && g_m.char_setMaxWeight) {
             if (!g_weight_saved) {
                 g_weight_state = g_env->CallIntMethod(
@@ -2169,11 +2353,12 @@ namespace pz {
                 }
             }
             if (g_weight_saved) {
+                const jint capacity = std::max(g_weight_state, k_forced_carry_capacity);
                 g_env->CallVoidMethod(g_survival_player,
-                    g_m.char_setMaxWeight, 9999);
+                    g_m.char_setMaxWeight, capacity);
                 if (g_env->ExceptionCheck()) g_env->ExceptionClear();
             }
-        } else if (!features.anti_encumbrance && g_survival_player &&
+        } else if (!features.unlimited_carry && g_survival_player &&
             g_weight_saved && g_m.char_setMaxWeight) {
             g_env->CallVoidMethod(g_survival_player,
                 g_m.char_setMaxWeight, g_weight_state);
@@ -2205,11 +2390,14 @@ namespace pz {
             }
         }
 
+        if (features.infinite_ammo)
+            static_cast<void>(set_current_weapon_ammo_to_max());
+
         // Auto heal: cure all diseases, infections, wounds every tick
         if (player && features.auto_heal)
             apply_auto_heal(player);
 
-        if (!features.god_mode && !features.anti_encumbrance &&
+        if (!features.god_mode && !features.unlimited_carry &&
             g_survival_player && !g_invincible_saved && !g_weight_saved) {
             g_env->DeleteGlobalRef(g_survival_player);
             g_survival_player = nullptr;
@@ -2226,46 +2414,8 @@ namespace pz {
         pzj::jframe fr;
         if (!fr.ok) return;
 
-        const auto player = static_cast<jobject>(
-            g_env->CallStaticObjectMethod(g_cls.isoPlayer, g_m.player_getInstance));
-        if (g_env->ExceptionCheck() || !player) { g_env->ExceptionClear(); return; }
-
-        // IsoPlayer has getInventory; the held item path needs
-        // getUseHandItem/getPrimaryHandItem - resolve lazily.
-        static jmethodID get_held = nullptr;
-        if (!get_held) {
-            // Try getPrimaryHandItem on IsoGameCharacter (weapon in the
-            // primary hand = the one the player is aiming with).
-            get_held = g_env->GetMethodID(g_cls.isoGameCharacter, "getPrimaryHandItem",
-                "()Lzombie/inventory/InventoryItem;");
-            if (!get_held) g_env->ExceptionClear();
-        }
-        if (!get_held) return;
-
-        const auto held = static_cast<jobject>(
-            g_env->CallObjectMethod(player, get_held));
-        if (g_env->ExceptionCheck() || !held) { g_env->ExceptionClear(); return; }
-
-        if (!g_cls.handWeapon || !g_env->IsInstanceOf(held, g_cls.handWeapon)) return;
-
-        // Find the max ammo: HandWeapon.getMaxAmmo() (not cached above).
-        static jmethodID get_max_ammo = nullptr;
-        if (!get_max_ammo) {
-            get_max_ammo = g_env->GetMethodID(g_cls.handWeapon, "getMaxAmmo", "()I");
-            if (!get_max_ammo) g_env->ExceptionClear();
-        }
-
-        int max = -1;
-        if (get_max_ammo) {
-            max = g_env->CallIntMethod(held, get_max_ammo);
-            if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); max = -1; }
-        }
-
-        if (max > 0 && g_m.inv_setCurrentAmmoCount) {
-            g_env->CallVoidMethod(held, g_m.inv_setCurrentAmmoCount, static_cast<jint>(max));
-            if (g_env->ExceptionCheck()) g_env->ExceptionClear();
-            pzlog2::log("refill_ammo -> %d", max);
-        }
+        if (set_current_weapon_ammo_to_max())
+            pzlog2::log("refill_ammo -> max");
     }
 
     bool shutdown()
@@ -2329,6 +2479,7 @@ namespace pz {
             &g_cls.isoMovingObject,
             &g_cls.isoWorld,
             &g_cls.isoCell,
+            &g_cls.isoGridSquare,
             &g_cls.isoCamera,
             &g_cls.gameClient,
             &g_cls.climateManager,
@@ -2336,7 +2487,6 @@ namespace pz {
             &g_cls.scriptManager,
             &g_cls.itemScript,
             &g_cls.inventoryItem,
-            &g_cls.itemContainer,
             &g_cls.handWeapon,
             &g_cls.itemFactory,
             &g_cls.bodyDamage,

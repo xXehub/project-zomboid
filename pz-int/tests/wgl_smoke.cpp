@@ -14,6 +14,7 @@
 #include <thread>
 #include <vector>
 #include <array>
+#include "../src/projection.h"
 
 #pragma comment(lib, "opengl32.lib")
 namespace gl_ext {
@@ -63,10 +64,36 @@ bool contains(const std::string& text, const char* needle)
     return text.find(needle) != std::string::npos;
 }
 
+bool projection_contract_holds()
+{
+    const auto identity = pz::projection::from_exact(526.5f, 594.0f, 1.0f);
+    const auto zoomed = pz::projection::from_exact(1948.75f, 848.5f, 2.0f);
+    const auto invalid = pz::projection::from_exact(10.0f, 20.0f, 0.0f);
+    const auto player_box = pz::projection::esp_box_for(
+        pz::projection::esp_kind::humanoid, 320.0f, 240.0f, 2.0f);
+    const auto vehicle_box = pz::projection::esp_box_for(
+        pz::projection::esp_kind::vehicle, 320.0f, 240.0f, 0.5f);
+    const auto text_y = pz::projection::label_above(player_box.top, 12.0f);
+    return identity.x == 526.5f && identity.y == 594.0f &&
+        zoomed.x == 974.375f && zoomed.y == 424.25f &&
+        invalid.x == 10.0f && invalid.y == 20.0f &&
+        player_box.left == 313.0f && player_box.right == 327.0f &&
+        player_box.top == 212.0f && player_box.bottom == 240.0f &&
+        player_box.label_y == 204.0f && text_y == 192.0f &&
+        vehicle_box.left == 292.0f && vehicle_box.right == 348.0f &&
+        vehicle_box.top == 160.0f && vehicle_box.bottom == 240.0f &&
+        vehicle_box.label_y == 152.0f;
+}
+
 } // namespace
 
 int wmain(int argc, wchar_t** argv)
 {
+    if (!projection_contract_holds()) {
+        std::cerr << "projection zoom contract failed\n";
+        return 1;
+    }
+
     const std::filesystem::path dll_path = argc > 1
         ? std::filesystem::absolute(argv[1])
         : std::filesystem::absolute(L"release\\pz-int.dll");

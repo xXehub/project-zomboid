@@ -128,12 +128,14 @@ namespace seh {
 	static void safe_toggles()      { __try {
 		const pz::survival_features features{
 			.full_bright = menu_state::full_bright,
+			.night_vision = menu_state::night_vision,
 			.zombie_ignore = menu_state::zombie_ignore,
 			.god_mode = menu_state::god_mode,
 			.anti_hunger = menu_state::anti_hunger,
-			.anti_encumbrance = menu_state::anti_encumbrance,
+			.unlimited_carry = menu_state::unlimited_carry,
 			.anti_thirst = menu_state::anti_thirst,
-			.auto_heal = menu_state::auto_heal
+			.auto_heal = menu_state::auto_heal,
+			.infinite_ammo = menu_state::infinite_ammo
 		};
 		pz::apply_survival_features(features);
 	} __except (EXCEPTION_EXECUTE_HANDLER) {} }

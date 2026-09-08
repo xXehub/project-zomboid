@@ -65,23 +65,26 @@ namespace pz {
 	// Calls between refreshes return immediately and preserve the last snapshot.
 	void collect_entities( std::vector< entity >& out );
 
+    // Zoom used by the cached frame projection; no JNI calls. Zero when invalid.
+    float projection_zoom( ) noexcept;
+
     // ---- item database / spawning ------------------------------------------
 
     // Number of known item definitions (ScriptManager.instance.getAllItems()).
     int item_db_count( );
 
     // Iterate the item database. Returns nullptr when idx is out of range.
-    // *out_full_type  - e.g. "Base.Axe" (the string AddItem wants)
+    // *out_full_type  - e.g. "Base.Axe" (the world-spawn API input)
     // *out_display    - human readable name for the list UI
     const char* item_db_get( int idx, const char** out_display );
 
-    // One-click spawn into the local player's inventory.
+    // One-click spawn on the local player's current ground square.
     bool spawn_item( const char* full_type );
 
-    // Custom spawn: any item, chosen condition (0-100, -1 = leave default),
-    // and ammo count for ranged weapons (-1 = leave default). Goes through
-    // InventoryItemFactory.CreateItem + setCondition + ammo setters and then
-    // hands the item to the inventory.
+    // Custom ground spawn: any item, chosen condition
+    // (0-100, -1 = leave default), and ammo count for ranged weapons
+    // (-1 = leave default). Client multiplayer builds refuse ground spawning
+    // because installed Build 42 only transmits these overloads from GameServer.
     bool spawn_item_custom( const char* full_type, int condition, int ammo );
 
 	struct survival_features {
@@ -90,9 +93,10 @@ namespace pz {
 		bool zombie_ignore{ false };
 		bool god_mode{ false };
 		bool anti_hunger{ false };
-		bool anti_encumbrance{ false };
+		bool unlimited_carry{ false };
 		bool anti_thirst{ false };
 		bool auto_heal{ false };
+		bool infinite_ammo{ false };
 	};
 
 	// Applies transition-based world overrides and a 10 Hz local-player hold.
@@ -112,7 +116,7 @@ namespace pz {
         bool isoutils_available;
         bool climate_method_api;   // true = Build 42 setOverride/setEnableOverride available
         bool climate_fields_ok;    // true = at least desaturation field resolved
-        bool container_sync_ok;    // true = requestSync method available
+        bool world_spawn_api_available; // true = Build 42 square spawn methods available, not delivery proof
         char last_spawn_result[128];
     };
     debug_info get_debug_info( );
