@@ -16,6 +16,7 @@
 #include <vector>
 #include <string>
 
+#include "projection.h"
 namespace pz {
 
     // Entity classification for the ESP overlay.
@@ -51,6 +52,7 @@ namespace pz {
         float render_wy{ 0.0f };
         float render_wz{ 0.0f };
         bool render_position_valid{ false };
+        projection::character_pose pose{ projection::character_pose::standing };
     };
 
     struct aim_direction {
@@ -118,6 +120,7 @@ namespace pz {
 		bool god_mode{ false };
 		bool anti_hunger{ false };
 		bool unlimited_carry{ false };
+		bool anti_overload{ false };
 		bool anti_thirst{ false };
 		bool auto_heal{ false };
 		bool infinite_ammo{ false };

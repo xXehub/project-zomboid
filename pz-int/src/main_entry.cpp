@@ -134,6 +134,7 @@ namespace seh {
 			.god_mode = menu_state::god_mode,
 			.anti_hunger = menu_state::anti_hunger,
 			.unlimited_carry = menu_state::unlimited_carry,
+			.anti_overload = menu_state::anti_overload,
 			.anti_thirst = menu_state::anti_thirst,
 			.auto_heal = menu_state::auto_heal,
 			.infinite_ammo = menu_state::infinite_ammo,

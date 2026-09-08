@@ -41,6 +41,7 @@ struct screen_point {
 }
 
 enum class esp_kind { humanoid, vehicle, animal, item };
+enum class character_pose { standing, crawling, floor, sitting };
 
 struct esp_box {
     float left{};
@@ -51,16 +52,48 @@ struct esp_box {
 };
 
 [[nodiscard]] constexpr esp_box esp_box_for(
-    const esp_kind kind, const float x, const float y, const float zoom) noexcept
+    const esp_kind kind, const character_pose pose,
+    const float x, const float y, const float zoom) noexcept
 {
     const float scale = visual_zoom(zoom);
-    const float height = kind == esp_kind::humanoid ? 80.0f / scale :
-        kind == esp_kind::vehicle ? 72.0f / scale :
-        kind == esp_kind::animal ? 50.0f / scale : 0.0f;
-    const float half_width = kind == esp_kind::humanoid ? 16.0f / scale :
-        kind == esp_kind::vehicle ? 58.0f / scale :
-        kind == esp_kind::animal ? 24.0f / scale : 0.0f;
-    return { x - half_width, y - height, x + half_width, y, y - height - 8.0f };
+    float height{};
+    float half_width{};
+    float bottom_offset{};
+
+    if (kind == esp_kind::humanoid) {
+        switch (pose) {
+        case character_pose::crawling:
+            height = 44.0f;
+            half_width = 30.0f;
+            bottom_offset = 6.0f;
+            break;
+        case character_pose::floor:
+            height = 36.0f;
+            half_width = 36.0f;
+            bottom_offset = 10.0f;
+            break;
+        case character_pose::sitting:
+            height = 66.0f;
+            half_width = 23.0f;
+            bottom_offset = 4.0f;
+            break;
+        case character_pose::standing:
+            height = 105.0f;
+            half_width = 18.0f;
+            break;
+        }
+    } else if (kind == esp_kind::vehicle) {
+        height = 72.0f;
+        half_width = 58.0f;
+    } else if (kind == esp_kind::animal) {
+        height = 50.0f;
+        half_width = 24.0f;
+    }
+
+    const float top = y - height / scale + bottom_offset / scale;
+    const float bottom = y + bottom_offset / scale;
+    return { x - half_width / scale, top, x + half_width / scale,
+        bottom, top - 8.0f };
 }
 
 // The bottom edge of each text row stays eight screen pixels above its anchor.

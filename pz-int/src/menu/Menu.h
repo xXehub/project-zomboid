@@ -31,6 +31,7 @@ namespace menu_state {
 	extern bool god_mode;
 	extern bool anti_hunger;
 	extern bool unlimited_carry;
+	extern bool anti_overload;
 	extern bool anti_thirst;
 	extern bool auto_heal;
 	extern bool infinite_ammo;

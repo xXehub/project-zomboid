@@ -44,7 +44,7 @@ float g_menu_accent[4] = {0.47f,0.68f,0.86f,1.0f};
 
 namespace menu_state {
 	bool full_bright=false, night_vision=false, zombie_ignore=false, god_mode=false;
-	bool anti_hunger=false, unlimited_carry=false, anti_thirst=false;
+	bool anti_hunger=false, unlimited_carry=false, anti_overload=false, anti_thirst=false;
 	bool auto_heal=false, infinite_ammo=false;
 	bool unlimited_endurance=false, instant_actions=false, aim_assist=false;
 	float aim_assist_max_dist=20.f;
@@ -149,6 +149,7 @@ void Menu::Shutdown() {
 	menu_state::god_mode=false;
 	menu_state::anti_hunger=false;
 	menu_state::unlimited_carry=false;
+	menu_state::anti_overload=false;
 	menu_state::anti_thirst=false;
 	menu_state::auto_heal=false;
 	menu_state::infinite_ammo=false;
@@ -203,6 +204,7 @@ void Menu::General() {
 			InsertCheckbox("Anti fatigue",menu_state::anti_fatigue);
 			InsertCheckbox("All needs",menu_state::all_needs);
 			InsertCheckbox("Unlimited carry",menu_state::unlimited_carry);
+			InsertCheckbox("Anti overload",menu_state::anti_overload);
 			InsertCheckbox("Unlimited endurance",menu_state::unlimited_endurance);
 			InsertCheckbox("Instant actions",menu_state::instant_actions);
 			InsertCheckbox("Invisible",menu_state::invisible);
@@ -455,6 +457,7 @@ namespace config_io {
 		float aim_assist_max_dist;
 		bool perfect_accuracy, always_critical, one_hit;
 		bool anti_fatigue, all_needs, invisible, noclip, debug_bypass;
+		bool anti_overload;
 	};
 	static constexpr std::size_t legacy_size=offsetof(config_data,unlimited_endurance);
 	static std::string sanitize(const std::string& in) {
@@ -482,6 +485,7 @@ namespace config_io {
 		d.perfect_accuracy=menu_state::perfect_accuracy; d.always_critical=menu_state::always_critical; d.one_hit=menu_state::one_hit;
 		d.anti_fatigue=menu_state::anti_fatigue; d.all_needs=menu_state::all_needs;
 		d.invisible=menu_state::invisible; d.noclip=menu_state::noclip; d.debug_bypass=menu_state::debug_bypass;
+		d.anti_overload=menu_state::anti_overload;
 		d.ze_en=menu_state::zombie_esp_enabled; d.ze_dist=menu_state::zombie_esp_max_dist;
 		d.ze_box=menu_state::zombie_esp_box; d.ze_name=menu_state::zombie_esp_name;
 		d.ze_hp=menu_state::zombie_esp_health; d.ze_sd=menu_state::zombie_esp_show_dist;
@@ -514,6 +518,7 @@ namespace config_io {
 		menu_state::perfect_accuracy=d.perfect_accuracy; menu_state::always_critical=d.always_critical; menu_state::one_hit=d.one_hit;
 		menu_state::anti_fatigue=d.anti_fatigue; menu_state::all_needs=d.all_needs;
 		menu_state::invisible=d.invisible; menu_state::noclip=d.noclip; menu_state::debug_bypass=d.debug_bypass;
+		menu_state::anti_overload=d.anti_overload;
 		menu_state::zombie_esp_enabled=d.ze_en; menu_state::zombie_esp_max_dist=d.ze_dist;
 		menu_state::zombie_esp_box=d.ze_box; menu_state::zombie_esp_name=d.ze_name;
 		menu_state::zombie_esp_health=d.ze_hp; menu_state::zombie_esp_show_dist=d.ze_sd;
@@ -644,6 +649,7 @@ void Menu::Settings() {
 			if(ImGui::Button("Reset settings",ImVec2(174.f,22.f))){
 				menu_state::full_bright=menu_state::night_vision=menu_state::zombie_ignore=menu_state::god_mode=false;
 				menu_state::anti_hunger=menu_state::unlimited_carry=menu_state::anti_thirst=false;
+				menu_state::anti_overload=false;
 				menu_state::auto_heal=menu_state::infinite_ammo=false;
 				menu_state::unlimited_endurance=menu_state::instant_actions=menu_state::aim_assist=false;
 				menu_state::perfect_accuracy=menu_state::always_critical=menu_state::one_hit=false;
@@ -721,7 +727,8 @@ void DrawOverlay(){
 			ImU32 shadow=IM_COL32(0,0,0,200);
 			const auto kind=(z||p)?pz::projection::esp_kind::humanoid:
 				v?pz::projection::esp_kind::vehicle:a?pz::projection::esp_kind::animal:pz::projection::esp_kind::item;
-			const auto box=pz::projection::esp_box_for(kind,e.sx,e.sy,zoom);
+			const auto pose=(z||p)?e.pose:pz::projection::character_pose::standing;
+			const auto box=pz::projection::esp_box_for(kind,pose,e.sx,e.sy,zoom);
 			const float bh=box.bottom-box.top;
 			if(show_box&&bh>0){
 				const float x1=box.left,y1=box.top,x2=box.right,y2=box.bottom;
