@@ -48,8 +48,8 @@ namespace menu_state {
 	bool auto_heal=false, infinite_ammo=false;
 	bool unlimited_endurance=false, instant_actions=false, aim_assist=false;
 	float aim_assist_max_dist=20.f;
-	bool perfect_accuracy=false, always_critical=false, one_hit=false;
-	bool anti_fatigue=false, all_needs=false, invisible=false, noclip=false, debug_bypass=false;
+	bool perfect_accuracy=false, one_hit=false;
+	bool anti_fatigue=false, all_needs=false, invisible=false, noclip=false;
 	bool zombie_esp_enabled=true; float zombie_esp_max_dist=50.f;
 	bool zombie_esp_box=true, zombie_esp_name=false, zombie_esp_health=false, zombie_esp_show_dist=false;
 	float zombie_esp_color[4]={0.87f,0.27f,0.27f,1.0f};
@@ -148,8 +148,8 @@ void Menu::Shutdown() {
 	menu_state::zombie_ignore=false;
 	menu_state::god_mode=false;
 	menu_state::anti_hunger=false;
-	menu_state::unlimited_carry=false;
 	menu_state::anti_overload=false;
+	menu_state::unlimited_carry=false;
 	menu_state::anti_thirst=false;
 	menu_state::auto_heal=false;
 	menu_state::infinite_ammo=false;
@@ -157,13 +157,11 @@ void Menu::Shutdown() {
 	menu_state::instant_actions=false;
 	menu_state::aim_assist=false;
 	menu_state::perfect_accuracy=false;
-	menu_state::always_critical=false;
 	menu_state::one_hit=false;
 	menu_state::anti_fatigue=false;
 	menu_state::all_needs=false;
 	menu_state::invisible=false;
 	menu_state::noclip=false;
-	menu_state::debug_bypass=false;
 	menu_state::zombie_esp_enabled=false;
 	menu_state::zombie_esp_box=false;
 	menu_state::zombie_esp_name=false;
@@ -195,7 +193,7 @@ void Menu::Shutdown() {
 void Menu::General() {
 	ImGuiStyle* style=&ImGui::GetStyle(); InsertSpacer("Top Spacer");
 	ImGui::Columns(2,NULL,false);{
-		InsertGroupBoxLeft(ENCL("Character"),320.f);{
+		InsertGroupBoxLeft(ENCL("Character"),300.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
 			InsertCheckbox("God mode",menu_state::god_mode);
 			InsertCheckbox("Auto heal",menu_state::auto_heal);
@@ -212,43 +210,46 @@ void Menu::General() {
 			InsertCheckbox("Zombies ignore",menu_state::zombie_ignore);
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
 		}InsertEndGroupBoxLeft(ENCL("Character Cover"),ENCL("Character"));
-		InsertSpacer("C-S Spacer");
-		InsertGroupBoxLeft(ENCL("Status"),150.f);{
-			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
-			int zc=0,pc=0,vc=0,ac=0,ic=0;
-			for(const auto&e:g_entities){
-				switch(e.type){
-				case pz::entity_type::zombie:++zc;break;
-				case pz::entity_type::player:++pc;break;
-				case pz::entity_type::vehicle:++vc;break;
-				case pz::entity_type::animal:++ac;break;
-				case pz::entity_type::item:++ic;break;
-				}
-			}
-			ImGui::Text("Game: %s",g_game_ready?"ready":"waiting...");
-			ImGui::Text("Zombies %d  Players %d",zc,pc);
-			ImGui::Text("Vehicles %d  Animals %d",vc,ac);
-			ImGui::Text("Items %d",ic);
-			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-		}InsertEndGroupBoxLeft(ENCL("Status Cover"),ENCL("Status"));
-	}ImGui::NextColumn();{
-		InsertGroupBoxRight(ENCL("Combat"),488.f);{
+		InsertSpacer("C-Cmb Spacer");
+		InsertGroupBoxLeft(ENCL("Combat"),214.f);{
 			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
 			InsertCheckbox("Aim assist",menu_state::aim_assist);
 			{float t=menu_state::aim_assist_max_dist;InsertSlider("Aim range##aimd",t,3.f,50.f,"%.0f");menu_state::aim_assist_max_dist=t;}
 			InsertCheckbox("Perfect accuracy",menu_state::perfect_accuracy);
-			InsertCheckbox("Always critical",menu_state::always_critical);
 			InsertCheckbox("One-hit damage",menu_state::one_hit);
 			InsertCheckbox("Infinite ammo",menu_state::infinite_ammo);
 			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);
 			if(ImGui::Button(ENCL("Refill ammo"),ImVec2(220.f,26.f)))pz::refill_ammo();
-			InsertCheckbox("Debug bypass",menu_state::debug_bypass);
 			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);
 			if(ImGui::Button(ENCL("Grant admin access"),ImVec2(220.f,26.f)))pz::grant_admin();
-			ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(19.f);
-			ImGui::TextDisabled("Nearest zombie while aiming");
 			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
-		}InsertEndGroupBoxRight(ENCL("Combat Cover"),ENCL("Combat"));
+		}InsertEndGroupBoxLeft(ENCL("Combat Cover"),ENCL("Combat"));
+	}ImGui::NextColumn();{
+		InsertGroupBoxRight(ENCL("Skills"),520.f);{
+			style->ItemSpacing=ImVec2(4,2);style->WindowPadding=ImVec2(4,4);ImGui::CustomSpacing(9.f);
+			const int n=pz::perk_count();
+			if(n<=0){
+				ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(14.f);
+				ImGui::TextDisabled(g_game_ready?"No skills available":"Waiting for game...");
+			}else{
+				for(int i=0;i<n;++i){
+					const char* nm=pz::perk_name(i);
+					if(!nm||!nm[0])continue;
+					const int lvl=pz::perk_level(i);
+					float f=(float)lvl;
+					char id[80];_snprintf_s(id,sizeof(id),_TRUNCATE,"##sk%d",i);
+					ImGui::Spacing();ImGui::NewLine();ImGui::SameLine(14.f);
+					ImGui::Text("%s",nm);
+					ImGui::SameLine(150.f);ImGui::PushItemWidth(90.f);
+					if(ImGui::SliderFloat(id,&f,0.f,10.f,"%.0f")){
+						const int nl=(int)(f+0.5f);
+						if(nl!=lvl)pz::set_perk_level(i,nl);
+					}
+					ImGui::PopItemWidth();
+				}
+			}
+			style->ItemSpacing=ImVec2(0,0);style->WindowPadding=ImVec2(6,6);
+		}InsertEndGroupBoxRight(ENCL("Skills Cover"),ENCL("Skills"));
 	}ImGui::Columns(1);
 }
 
@@ -455,8 +456,8 @@ namespace config_io {
 		bool esp_render; float menu_col[4]; int menu_key;
 		bool unlimited_endurance, instant_actions, aim_assist;
 		float aim_assist_max_dist;
-		bool perfect_accuracy, always_critical, one_hit;
-		bool anti_fatigue, all_needs, invisible, noclip, debug_bypass;
+		bool perfect_accuracy, one_hit;
+		bool anti_fatigue, all_needs, invisible, noclip;
 		bool anti_overload;
 	};
 	static constexpr std::size_t legacy_size=offsetof(config_data,unlimited_endurance);
@@ -482,9 +483,9 @@ namespace config_io {
 		d.auto_heal=menu_state::auto_heal; d.infinite_ammo=menu_state::infinite_ammo;
 		d.unlimited_endurance=menu_state::unlimited_endurance; d.instant_actions=menu_state::instant_actions;
 		d.aim_assist=menu_state::aim_assist; d.aim_assist_max_dist=menu_state::aim_assist_max_dist;
-		d.perfect_accuracy=menu_state::perfect_accuracy; d.always_critical=menu_state::always_critical; d.one_hit=menu_state::one_hit;
+		d.perfect_accuracy=menu_state::perfect_accuracy; d.one_hit=menu_state::one_hit;
 		d.anti_fatigue=menu_state::anti_fatigue; d.all_needs=menu_state::all_needs;
-		d.invisible=menu_state::invisible; d.noclip=menu_state::noclip; d.debug_bypass=menu_state::debug_bypass;
+		d.invisible=menu_state::invisible; d.noclip=menu_state::noclip;
 		d.anti_overload=menu_state::anti_overload;
 		d.ze_en=menu_state::zombie_esp_enabled; d.ze_dist=menu_state::zombie_esp_max_dist;
 		d.ze_box=menu_state::zombie_esp_box; d.ze_name=menu_state::zombie_esp_name;
@@ -515,9 +516,9 @@ namespace config_io {
 		menu_state::auto_heal=d.auto_heal; menu_state::infinite_ammo=d.infinite_ammo;
 		menu_state::unlimited_endurance=d.unlimited_endurance; menu_state::instant_actions=d.instant_actions;
 		menu_state::aim_assist=d.aim_assist; menu_state::aim_assist_max_dist=d.aim_assist_max_dist>0.f?d.aim_assist_max_dist:20.f;
-		menu_state::perfect_accuracy=d.perfect_accuracy; menu_state::always_critical=d.always_critical; menu_state::one_hit=d.one_hit;
+		menu_state::perfect_accuracy=d.perfect_accuracy; menu_state::one_hit=d.one_hit;
 		menu_state::anti_fatigue=d.anti_fatigue; menu_state::all_needs=d.all_needs;
-		menu_state::invisible=d.invisible; menu_state::noclip=d.noclip; menu_state::debug_bypass=d.debug_bypass;
+		menu_state::invisible=d.invisible; menu_state::noclip=d.noclip;
 		menu_state::anti_overload=d.anti_overload;
 		menu_state::zombie_esp_enabled=d.ze_en; menu_state::zombie_esp_max_dist=d.ze_dist;
 		menu_state::zombie_esp_box=d.ze_box; menu_state::zombie_esp_name=d.ze_name;
@@ -652,9 +653,9 @@ void Menu::Settings() {
 				menu_state::anti_overload=false;
 				menu_state::auto_heal=menu_state::infinite_ammo=false;
 				menu_state::unlimited_endurance=menu_state::instant_actions=menu_state::aim_assist=false;
-				menu_state::perfect_accuracy=menu_state::always_critical=menu_state::one_hit=false;
+				menu_state::perfect_accuracy=menu_state::one_hit=false;
 				menu_state::anti_fatigue=menu_state::all_needs=false;
-				menu_state::invisible=menu_state::noclip=menu_state::debug_bypass=false;
+				menu_state::invisible=menu_state::noclip=false;
 				menu_state::aim_assist_max_dist=20.f;
 				menu_state::zombie_esp_enabled=menu_state::player_esp_enabled=true;
 				menu_state::zombie_esp_max_dist=menu_state::player_esp_max_dist=50.f;

@@ -133,7 +133,6 @@ namespace seh {
 			.zombie_ignore = menu_state::zombie_ignore,
 			.god_mode = menu_state::god_mode,
 			.anti_hunger = menu_state::anti_hunger,
-			.unlimited_carry = menu_state::unlimited_carry,
 			.anti_overload = menu_state::anti_overload,
 			.anti_thirst = menu_state::anti_thirst,
 			.auto_heal = menu_state::auto_heal,
@@ -143,13 +142,12 @@ namespace seh {
 			.aim_assist = menu_state::aim_assist,
 			.aim_assist_max_dist = menu_state::aim_assist_max_dist,
 			.perfect_accuracy = menu_state::perfect_accuracy,
-			.always_critical = menu_state::always_critical,
 			.one_hit = menu_state::one_hit,
 			.anti_fatigue = menu_state::anti_fatigue,
 			.all_needs = menu_state::all_needs,
 			.invisible = menu_state::invisible,
 			.noclip = menu_state::noclip,
-			.debug_bypass = menu_state::debug_bypass
+			.unlimited_carry = menu_state::unlimited_carry
 		};
 		pz::apply_survival_features(features, g_entities);
 	} __except (EXCEPTION_EXECUTE_HANDLER) {} }

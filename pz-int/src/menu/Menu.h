@@ -40,13 +40,11 @@ namespace menu_state {
 	extern bool aim_assist;
 	extern float aim_assist_max_dist;
 	extern bool perfect_accuracy;
-	extern bool always_critical;
 	extern bool one_hit;
 	extern bool anti_fatigue;
 	extern bool all_needs;
 	extern bool invisible;
 	extern bool noclip;
-	extern bool debug_bypass;
 
 	extern bool  zombie_esp_enabled;
 	extern float zombie_esp_max_dist;

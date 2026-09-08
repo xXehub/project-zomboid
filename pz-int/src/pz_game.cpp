@@ -147,6 +147,7 @@ namespace pzj {
         jclass playerCheats{};
         jclass cheatType{};
         jclass enumSet{};
+        jclass perkFactory{};
     } g_cls;
 
     struct methods {
@@ -175,6 +176,10 @@ namespace pzj {
         jmethodID zombie_isSitAgainstWall{};
         jmethodID char_setForwardDirection{};
         jmethodID player_isAiming{};
+        jfieldID perkfactory_list{};
+        jmethodID perkfactory_getName{};
+        jmethodID char_getPerkLevel{};
+        jmethodID char_setPerkLevelDebug{};
         jmethodID weapon_getHitChance{};
         jmethodID weapon_setHitChance{};
         jmethodID weapon_getRecoilDelay{};
@@ -612,6 +617,7 @@ namespace pzj {
         c.playerCheats = fc("zombie/characters/PlayerCheats");
         c.cheatType = fc("zombie/characters/CheatType");
         c.enumSet = fc("java/util/EnumSet");
+        c.perkFactory = fc("zombie/characters/skills/PerkFactory");
         m.player_getInstance = sm(c.isoPlayer, "getInstance",
             "()Lzombie/characters/IsoPlayer;");
         m.player_getPlayerNum = gm(c.isoPlayer, "getPlayerNum", "()I");
@@ -643,6 +649,13 @@ namespace pzj {
         m.char_setForwardDirection = gm(c.isoGameCharacter,
             "setForwardDirection", "(FF)V");
         m.player_isAiming = gm(c.isoPlayer, "isAiming", "()Z");
+        m.perkfactory_list = sf(c.perkFactory, "PerkList", "Ljava/util/ArrayList;");
+        m.perkfactory_getName = sm(c.perkFactory, "getPerkName",
+            "(Lzombie/characters/skills/PerkFactory$Perk;)Ljava/lang/String;");
+        m.char_getPerkLevel = gm(c.isoGameCharacter, "getPerkLevel",
+            "(Lzombie/characters/skills/PerkFactory$Perk;)I");
+        m.char_setPerkLevelDebug = gm(c.isoGameCharacter, "setPerkLevelDebug",
+            "(Lzombie/characters/skills/PerkFactory$Perk;I)V");
 
         m.weapon_getHitChance = gm(c.handWeapon, "getHitChance", "()I");
         m.weapon_setHitChance = gm(c.handWeapon, "setHitChance", "(I)V");
@@ -2182,6 +2195,7 @@ namespace pz {
     static bool g_noclip_applied = false;
     static bool g_endurance_applied = false;
     static bool g_instant_actions_applied = false;
+    static bool g_carry_applied = false;
     // Unlimited carry / anti overload force the maxWeight pair directly.
     static bool g_maxweight_saved = false;
     static jint g_maxweight_value = 0;
@@ -2209,7 +2223,6 @@ namespace pz {
             lhs.zombie_ignore == rhs.zombie_ignore &&
             lhs.god_mode == rhs.god_mode &&
             lhs.anti_hunger == rhs.anti_hunger &&
-            lhs.unlimited_carry == rhs.unlimited_carry &&
             lhs.anti_overload == rhs.anti_overload &&
             lhs.anti_thirst == rhs.anti_thirst &&
             lhs.auto_heal == rhs.auto_heal &&
@@ -2219,13 +2232,12 @@ namespace pz {
             lhs.aim_assist == rhs.aim_assist &&
             lhs.aim_assist_max_dist == rhs.aim_assist_max_dist &&
             lhs.perfect_accuracy == rhs.perfect_accuracy &&
-            lhs.always_critical == rhs.always_critical &&
             lhs.one_hit == rhs.one_hit &&
             lhs.anti_fatigue == rhs.anti_fatigue &&
             lhs.all_needs == rhs.all_needs &&
             lhs.invisible == rhs.invisible &&
             lhs.noclip == rhs.noclip &&
-            lhs.debug_bypass == rhs.debug_bypass;
+            lhs.unlimited_carry == rhs.unlimited_carry;
     }
 
     // Cure all diseases, infections, wounds, and negative stats on the player.
@@ -2452,7 +2464,8 @@ namespace pz {
         if (!g_survival_player) {
             return !g_invincible_saved && !g_maxweight_saved &&
                 !g_noclip_applied && !g_invisible_applied &&
-                !g_endurance_applied && !g_instant_actions_applied;
+                !g_endurance_applied && !g_instant_actions_applied &&
+                !g_carry_applied;
         }
 
         bool success = true;
@@ -2496,10 +2509,11 @@ namespace pz {
         clear_cheat(g_m.cheat_invisible, g_invisible_applied);
         clear_cheat(g_m.cheat_endurance, g_endurance_applied);
         clear_cheat(g_m.cheat_instant_actions, g_instant_actions_applied);
+        clear_cheat(g_m.cheat_carry, g_carry_applied);
 
         const bool restored = !g_invincible_saved && !g_maxweight_saved &&
             !g_noclip_applied && !g_invisible_applied &&
-            !g_endurance_applied && !g_instant_actions_applied;
+            !g_endurance_applied && !g_instant_actions_applied && !g_carry_applied;
         if (restored) {
             g_env->DeleteGlobalRef(g_survival_player);
             g_survival_player = nullptr;
@@ -2510,8 +2524,7 @@ namespace pz {
     [[nodiscard]] static bool weapon_features_enabled(
         const survival_features& features) noexcept
     {
-        return features.perfect_accuracy || features.always_critical ||
-            features.one_hit;
+        return features.perfect_accuracy || features.one_hit;
     }
 
     static bool restore_weapon_state()
@@ -2617,8 +2630,6 @@ namespace pz {
             features.perfect_accuracy ? jint{ 0 } : g_weapon_state.aiming_time);
         g_env->CallVoidMethod(held, g_m.weapon_setProjectileSpread,
             features.perfect_accuracy ? 0.0f : g_weapon_state.projectile_spread);
-        g_env->CallVoidMethod(held, g_m.weapon_setCriticalChance,
-            features.always_critical ? 100.0f : g_weapon_state.critical_chance);
         g_env->CallVoidMethod(held, g_m.weapon_setMinDamage,
             features.one_hit ? 1000.0f : g_weapon_state.min_damage);
         g_env->CallVoidMethod(held, g_m.weapon_setMaxDamage,
@@ -2782,10 +2793,11 @@ namespace pz {
         }
 
         const bool wants_cheatset = features.noclip || features.invisible ||
-            features.unlimited_endurance || features.instant_actions;
+            features.unlimited_endurance || features.instant_actions ||
+            features.unlimited_carry;
         const bool cheatset_active = g_noclip_applied || g_invisible_applied ||
-            g_endurance_applied || g_instant_actions_applied;
-        const bool wants_weight = features.unlimited_carry || features.anti_overload;
+            g_endurance_applied || g_instant_actions_applied || g_carry_applied;
+        const bool wants_weight = features.anti_overload;
         const bool needs_player = features.god_mode || features.anti_hunger ||
             wants_weight || features.anti_thirst || features.auto_heal ||
             features.infinite_ammo || features.anti_fatigue || features.all_needs ||
@@ -2936,8 +2948,7 @@ namespace pz {
         //     GameClient.client || GameServer.server. Force Core.debug true
         //     while any is active so isNoClip()/isInvisible()/... return true,
         //     then drive the backing EnumSet membership directly. ---
-        if ((wants_cheatset || features.debug_bypass) && g_cls.core &&
-            g_m.core_debug) {
+        if (wants_cheatset && g_cls.core && g_m.core_debug) {
             if (!g_debug_saved) {
                 g_debug_state = g_env->GetStaticBooleanField(
                     g_cls.core, g_m.core_debug);
@@ -2964,13 +2975,15 @@ namespace pz {
                 g_endurance_applied);
             drive_cheat(g_m.cheat_instant_actions, features.instant_actions,
                 g_instant_actions_applied);
+            drive_cheat(g_m.cheat_carry, features.unlimited_carry,
+                g_carry_applied);
         }
 
         // Restore Core.debug only after cheats no longer need it (membership
         // removal above is a direct EnumSet write, so it succeeds regardless).
-        const bool still_needs_debug = features.debug_bypass ||
+        const bool still_needs_debug =
             g_noclip_applied || g_invisible_applied ||
-            g_endurance_applied || g_instant_actions_applied;
+            g_endurance_applied || g_instant_actions_applied || g_carry_applied;
         if (!still_needs_debug && g_debug_saved && g_cls.core && g_m.core_debug) {
             g_env->SetStaticBooleanField(g_cls.core, g_m.core_debug, g_debug_state);
             if (g_env->ExceptionCheck()) g_env->ExceptionClear();
@@ -3021,6 +3034,113 @@ namespace pz {
         if (g_env->ExceptionCheck()) g_env->ExceptionClear();
         g_env->DeleteLocalRef(player);
         pzlog2::log("grant_admin -> accessLevel=admin");
+    }
+
+    // ---- skill / perk editor ------------------------------------------------
+    static std::vector<std::string> g_perk_names;
+    static std::vector<jobject> g_perks; // global refs into PerkFactory.PerkList
+
+    static bool build_perks()
+    {
+        if (!g_perks.empty()) return true;
+        if (!g_cls.perkFactory || !g_m.perkfactory_list ||
+            !g_m.perkfactory_getName || !pzj::ensure_list_methods()) {
+            return false;
+        }
+        const auto list = static_cast<jobject>(g_env->GetStaticObjectField(
+            g_cls.perkFactory, g_m.perkfactory_list));
+        if (g_env->ExceptionCheck() || !list) {
+            if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+            return false;
+        }
+        const jint n = g_env->CallIntMethod(list, g_m.list_size);
+        if (g_env->ExceptionCheck() || n <= 0) {
+            g_env->ExceptionClear();
+            g_env->DeleteLocalRef(list);
+            return false;
+        }
+        for (jint i = 0; i < n; ++i) {
+            const auto perk = static_cast<jobject>(
+                g_env->CallObjectMethod(list, g_m.list_get, i));
+            if (g_env->ExceptionCheck() || !perk) {
+                g_env->ExceptionClear();
+                continue;
+            }
+            char name[64]{};
+            const auto jname = static_cast<jstring>(g_env->CallStaticObjectMethod(
+                g_cls.perkFactory, g_m.perkfactory_getName, perk));
+            const bool named = !g_env->ExceptionCheck() && jname &&
+                pzj::jstr_to_utf8(jname, name, sizeof(name)) && name[0];
+            if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+            if (jname) g_env->DeleteLocalRef(jname);
+            if (!named || ::strcmp(name, "None") == 0) {
+                g_env->DeleteLocalRef(perk);
+                continue;
+            }
+            const auto global = g_env->NewGlobalRef(perk);
+            g_env->DeleteLocalRef(perk);
+            if (!global) { g_env->ExceptionClear(); continue; }
+            g_perks.push_back(global);
+            g_perk_names.emplace_back(name);
+        }
+        g_env->DeleteLocalRef(list);
+        return !g_perks.empty();
+    }
+
+    int perk_count()
+    {
+        if (!pzj::ensure_resolved()) return 0;
+        pzj::jframe fr{ 16 };
+        if (!fr.ok) return 0;
+        return build_perks() ? static_cast<int>(g_perks.size()) : 0;
+    }
+
+    const char* perk_name(int idx)
+    {
+        if (idx < 0 || idx >= static_cast<int>(g_perk_names.size())) return "";
+        return g_perk_names[static_cast<std::size_t>(idx)].c_str();
+    }
+
+    int perk_level(int idx)
+    {
+        if (!pzj::ensure_resolved()) return 0;
+        pzj::jframe fr{ 16 };
+        if (!fr.ok || !build_perks() || !g_m.char_getPerkLevel ||
+            idx < 0 || idx >= static_cast<int>(g_perks.size())) {
+            return 0;
+        }
+        const auto player = static_cast<jobject>(g_env->CallStaticObjectMethod(
+            g_cls.isoPlayer, g_m.player_getInstance));
+        if (g_env->ExceptionCheck() || !player) {
+            g_env->ExceptionClear();
+            return 0;
+        }
+        const jint level = g_env->CallIntMethod(player, g_m.char_getPerkLevel,
+            g_perks[static_cast<std::size_t>(idx)]);
+        if (g_env->ExceptionCheck()) { g_env->ExceptionClear(); }
+        g_env->DeleteLocalRef(player);
+        return static_cast<int>(level);
+    }
+
+    void set_perk_level(int idx, int level)
+    {
+        if (!pzj::ensure_resolved()) return;
+        pzj::jframe fr{ 16 };
+        if (!fr.ok || !build_perks() || !g_m.char_setPerkLevelDebug ||
+            idx < 0 || idx >= static_cast<int>(g_perks.size())) {
+            return;
+        }
+        const jint clamped = static_cast<jint>(std::clamp(level, 0, 10));
+        const auto player = static_cast<jobject>(g_env->CallStaticObjectMethod(
+            g_cls.isoPlayer, g_m.player_getInstance));
+        if (g_env->ExceptionCheck() || !player) {
+            g_env->ExceptionClear();
+            return;
+        }
+        g_env->CallVoidMethod(player, g_m.char_setPerkLevelDebug,
+            g_perks[static_cast<std::size_t>(idx)], clamped);
+        if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+        g_env->DeleteLocalRef(player);
     }
 
     bool shutdown()
@@ -3079,7 +3199,7 @@ namespace pz {
             if (!restored || climate_state_saved() || g_zombie_state_saved ||
                 g_invincible_saved || g_maxweight_saved || g_noclip_applied ||
                 g_invisible_applied || g_endurance_applied ||
-                g_instant_actions_applied || g_debug_saved ||
+                g_instant_actions_applied || g_carry_applied || g_debug_saved ||
                 g_weapon_state.weapon) {
                 pzlog2::log("feature restoration incomplete; retrying shutdown");
                 return false;
@@ -3087,7 +3207,7 @@ namespace pz {
         } else if (climate_state_saved() || g_zombie_state_saved ||
             g_invincible_saved || g_maxweight_saved || g_noclip_applied ||
             g_invisible_applied || g_endurance_applied ||
-            g_instant_actions_applied || g_debug_saved ||
+            g_instant_actions_applied || g_carry_applied || g_debug_saved ||
             g_weapon_state.weapon) {
             return false;
         }
@@ -3100,6 +3220,11 @@ namespace pz {
         g_item_cursor = 0;
         g_item_total = 0;
         g_items_built = false;
+        for (auto* const perk : g_perks) {
+            if (perk) g_env->DeleteGlobalRef(perk);
+        }
+        g_perks.clear();
+        g_perk_names.clear();
         g_last_features = {};
         g_climate_state = {};
         g_zombie_state = JNI_FALSE;
@@ -3109,6 +3234,7 @@ namespace pz {
         g_noclip_applied = false;
         g_endurance_applied = false;
         g_instant_actions_applied = false;
+        g_carry_applied = false;
         g_maxweight_saved = false;
         g_maxweight_value = 0;
         g_maxweightbase_value = 0;
@@ -3116,7 +3242,7 @@ namespace pz {
         g_frame_ctx = {};
         g_seen_world = false;
 
-        const std::array<jclass*, 31> classes{
+        const std::array<jclass*, 33> classes{
             &g_cls.isoPlayer,
             &g_cls.isoZombie,
             &g_cls.isoGameCharacter,
@@ -3147,6 +3273,8 @@ namespace pz {
             &g_cls.isoUtils,
             &g_cls.playerCheats,
             &g_cls.cheatType,
+            &g_cls.enumSet,
+            &g_cls.perkFactory,
             nullptr
         };
         for (auto* const cls : classes) {

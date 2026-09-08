@@ -119,7 +119,6 @@ namespace pz {
 		bool zombie_ignore{ false };
 		bool god_mode{ false };
 		bool anti_hunger{ false };
-		bool unlimited_carry{ false };
 		bool anti_overload{ false };
 		bool anti_thirst{ false };
 		bool auto_heal{ false };
@@ -129,13 +128,12 @@ namespace pz {
 		bool aim_assist{ false };
 		float aim_assist_max_dist{ 20.0f };
 		bool perfect_accuracy{ false };
-		bool always_critical{ false };
 		bool one_hit{ false };
 		bool anti_fatigue{ false };
 		bool all_needs{ false };
 		bool invisible{ false };
 		bool noclip{ false };
-		bool debug_bypass{ false };
+		bool unlimited_carry{ false };
 	};
 
 	// Applies transition-based world and combat overrides. The entity snapshot
@@ -167,5 +165,13 @@ namespace pz {
     // fullbright toggle, and reports everything.
     void dump_deep_debug( const std::vector< entity >& entities );
     void refill_ammo( );
+
+    // ---- skill / perk editor -----------------------------------------------
+    // PerkFactory.PerkList enumerated once; levels via getPerkLevel /
+    // setPerkLevelDebug (ungated). Zero when not in a world.
+    int perk_count( );
+    const char* perk_name( int idx );
+    int perk_level( int idx );
+    void set_perk_level( int idx, int level );
 
 } // namespace pz
